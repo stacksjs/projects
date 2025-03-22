@@ -1,0 +1,3 @@
+{
+  "extends": "./storage/framework/core/tsconfig.json"
+}

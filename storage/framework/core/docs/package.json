@@ -1,0 +1,54 @@
+{
+  "name": "@stacksjs/docs",
+  "type": "module",
+  "version": "0.70.10",
+  "description": "The Stacks way to document.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/docs#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/docs"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": ["docs", "utilities", "functions", "stacks"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "import": "./dist/*"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@iconify-json/carbon": "^1.2.8",
+    "@shikijs/vitepress-twoslash": "^3.2.1",
+    "@vite-pwa/assets-generator": "^0.2.6",
+    "@vite-pwa/vitepress": "^0.5.3",
+    "unocss": "^66.0.0",
+    "unplugin-icons": "^22.1.0",
+    "unplugin-vue-components": "^28.4.1",
+    "vite-plugin-pwa": "^0.21.1",
+    "vitepress": "1.6.3"
+  },
+  "devDependencies": {
+    "@stacksjs/alias": "workspace:*",
+    "@stacksjs/config": "workspace:*",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/path": "workspace:*",
+    "@stacksjs/server": "workspace:*"
+  }
+}

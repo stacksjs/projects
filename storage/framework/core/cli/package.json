@@ -1,0 +1,73 @@
+{
+  "name": "@stacksjs/cli",
+  "type": "module",
+  "version": "0.70.10",
+  "description": "TypeScript framework for CLI artisans. Build beautiful console apps with ease.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": [
+    "bun",
+    "cli",
+    "commands",
+    "command line interface",
+    "console",
+    "binary",
+    "apps",
+    "prompts",
+    "spinners",
+    "utilities",
+    "helpers",
+    "cac",
+    "ora",
+    "stacks"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "import": "./dist/*"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "@antfu/install-pkg": "^1.0.0",
+    "@clack/core": "^0.4.1",
+    "@stacksjs/collections": "workspace:*",
+    "@stacksjs/config": "workspace:*",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/error-handling": "workspace:*",
+    "@stacksjs/logging": "workspace:*",
+    "@stacksjs/path": "workspace:*",
+    "@stacksjs/types": "workspace:*",
+    "@stacksjs/utils": "workspace:*",
+    "@stacksjs/validation": "workspace:*",
+    "@types/prompts": "^2.4.9",
+    "ansi-escapes": "^7.0.0",
+    "cac": "^6.7.14",
+    "consola": "^3.4.2",
+    "kolorist": "1.8.0",
+    "ora": "^8.2.0",
+    "prompts": "^2.4.2",
+    "supports-hyperlinks": "^3.2.0"
+  }
+}

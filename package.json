@@ -1,0 +1,85 @@
+{
+  "name": "stacks",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Your project description",
+  "author": "your-name <your-email>",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "scripts": {
+    "build:reset": "rm -rf node_modules bun.lock && bun install && cd storage/framework && bun run build && cd ../../",
+    "buddy": "bun ./storage/framework/core/buddy/src/cli.ts",
+    "stacks": "./buddy",
+    "setup": "./storage/framework/scripts/setup.sh",
+    "fresh": "./buddy fresh",
+    "clean": "./buddy clean",
+    "upgrade": "./buddy upgrade",
+    "dev": "./buddy dev",
+    "development": "./buddy dev",
+    "build": "./buddy build",
+    "prod": "./buddy build",
+    "deploy": "./buddy deploy",
+    "lint": "./buddy lint",
+    "serve": "./buddy serve",
+    "make": "./buddy make",
+    "make:component": "./buddy make:component",
+    "make:function": "./buddy make:function",
+    "make:database": "./buddy make:migration",
+    "make:migration": "./buddy make:migration",
+    "make:notification": "./buddy make:notification",
+    "make:factory": "./buddy make:factory",
+    "make:lang": "./buddy make:lang",
+    "make:stack": "./buddy make:stack",
+    "key:generate": "./buddy key:generate",
+    "commit": "./buddy commit",
+    "release": "./buddy release",
+    "changelog": "./buddy changelog",
+    "generate": "./buddy generate",
+    "types:check": "bun tsc --noEmit",
+    "types:fix": "./buddy types:fix",
+    "test": "./buddy test",
+    "test:ui": "./buddy test:ui",
+    "test:coverage": "./buddy test:coverage",
+    "test:types": "./buddy test:types",
+    "bud": "./buddy",
+    "stx": "./buddy"
+  },
+  "dependencies": {
+    "stacks": "workspace:*"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-git"
+    }
+  },
+  "workspaces": [
+    "storage/framework",
+    "storage/framework/core",
+    "storage/framework/core/*",
+    "storage/framework/core/bun-create/*",
+    "storage/framework/core/components/*",
+    "storage/framework/docs",
+    "storage/framework/email",
+    "storage/framework/libs/*",
+    "storage/framework/libs/functions",
+    "storage/framework/libs/components/*",
+    "storage/framework/views/*",
+    "storage/framework/server"
+  ],
+  "devDependencies": {
+    "typescript": "5.8.2"
+  },
+  "overrides": {
+    "unconfig": "0.3.10"
+  }
+}
