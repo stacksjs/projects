@@ -1,0 +1,39 @@
+{
+  "name": "@stacksjs/config",
+  "type": "module",
+  "version": "0.69.5",
+  "description": "The Stacks config helper methods.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/config#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/config"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": ["config", "utilities", "functions", "stacks"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "bun": "./*"
+    }
+  },
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "@stacksjs/alias": "workspace:*",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/types": "workspace:*"
+  }
+}

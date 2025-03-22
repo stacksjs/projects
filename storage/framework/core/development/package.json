@@ -1,0 +1,60 @@
+{
+  "name": "@stacksjs/development",
+  "type": "module",
+  "version": "0.69.5",
+  "description": "The Stacks development dependencies.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/development#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/development"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": [
+    "development",
+    "dependencies",
+    "stacks",
+    "framework",
+    "typescript",
+    "ts-reset",
+    "javascript"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "import": "./dist/*"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["README.md"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@stacksjs/alias": "workspace:*",
+    "@stacksjs/build": "workspace:*",
+    "@stacksjs/lint": "workspace:*",
+    "@stacksjs/logging": "workspace:*",
+    "@stacksjs/rpx": "^0.10.0",
+    "@stacksjs/testing": "workspace:*",
+    "@stacksjs/tinker": "workspace:*",
+    "@stacksjs/tunnel": "workspace:*",
+    "@stacksjs/types": "workspace:*",
+    "bun-plugin-dtsx": "^0.21.9",
+    "typescript": "^5.8.2"
+  },
+  "devDependencies": {
+    "@total-typescript/ts-reset": "^0.6.1"
+  }
+}

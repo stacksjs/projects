@@ -1,0 +1,53 @@
+{
+  "name": "@stacksjs/server",
+  "type": "module",
+  "version": "0.69.5",
+  "description": "Local development and production-ready.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/server#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/server"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": [
+    "server",
+    "vite",
+    "nitro",
+    "automation",
+    "aws",
+    "google cloud",
+    "stacks"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "import": "./dist/*"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "@stacksjs/config": "workspace:*",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/path": "workspace:*",
+    "@stacksjs/router": "workspace:*",
+    "@stacksjs/validation": "workspace:*",
+    "bun-plugin-auto-imports": "^0.3.1",
+    "vite": "^6.2.2"
+  }
+}

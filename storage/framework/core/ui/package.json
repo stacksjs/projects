@@ -1,0 +1,80 @@
+{
+  "name": "@stacksjs/ui",
+  "type": "module",
+  "version": "0.69.5",
+  "description": "The Stacks UI engine.",
+  "author": "Chris Breuer",
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.org>"
+  ],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/ui#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/ui"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": [
+    "css",
+    "atomic",
+    "ui",
+    "engine",
+    "styles",
+    "stacks",
+    "unocss"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./components": {
+      "bun": "./src/components.ts",
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js"
+    },
+    "./unocss": {
+      "bun": "./src/unocss.ts",
+      "types": "./dist/unocss.d.ts",
+      "import": "./dist/unocss.js"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "README.md",
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "@headlessui/vue": "^1.7.23",
+    "@iconify-json/hugeicons": "^1.2.4",
+    "@iconify/json": "^2.2.318",
+    "@julr/unocss-preset-forms": "^1.0.0",
+    "@stacksjs/build": "workspace:*",
+    "@stacksjs/config": "workspace:*",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/router": "workspace:*",
+    "@unhead/vue": "^1.11.20",
+    "bun-plugin-unocss": "^0.1.2",
+    "chart.js": "^4.4.8",
+    "pinia": "^3.0.1",
+    "unhead": "^1.11.20",
+    "unocss": "66.0.0",
+    "unocss-preset-primitives": "0.0.2-beta.1",
+    "vite-plugin-vue-layouts": "^0.11.0",
+    "vue": "^3.5.13",
+    "vue-chartjs": "^5.3.2",
+    "vue-tsc": "^2.2.8"
+  }
+}

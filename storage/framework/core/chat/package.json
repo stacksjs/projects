@@ -1,0 +1,46 @@
+{
+  "name": "@stacksjs/chat",
+  "type": "module",
+  "version": "0.69.5",
+  "description": "Easily interact with chat APIs.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/chat#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/chat"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": ["chat", "stacks", "discord", "microsoft teams", "slack"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "import": "./dist/*"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@novu/slack": "^0.24.1"
+  },
+  "devDependencies": {
+    "@stacksjs/cli": "workspace:*",
+    "@stacksjs/config": "workspace:*",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/error-handling": "workspace:*",
+    "@stacksjs/types": "workspace:*"
+  }
+}

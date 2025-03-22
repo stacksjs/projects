@@ -1,0 +1,41 @@
+{
+  "name": "@stacksjs/datetime",
+  "type": "module",
+  "version": "0.69.5",
+  "description": "The Stacks datetime helpers.",
+  "author": "Chris Breuer",
+  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/chrisbbreuer",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/datetime#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/stacks.git",
+    "directory": "./storage/framework/core/datetime"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/stacks/issues"
+  },
+  "keywords": ["datetime", "date", "time", "helpers", "composables", "stacks"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "import": "./dist/*"
+    }
+  },
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "bun tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "@formkit/tempo": "^0.1.2",
+    "@stacksjs/development": "workspace:*",
+    "@stacksjs/utils": "workspace:*"
+  }
+}
