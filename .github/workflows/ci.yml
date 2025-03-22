@@ -1,0 +1,228 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main # deploys to prod
+
+    tags:
+      - '*-beta.*' # ensures it is deployed to stage in case `main`` is not pushed to
+
+  pull_request:
+    branches:
+      - main # deploys to dev
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Lint
+        run: bunx --bun eslint . --config ./config/lint.ts
+
+  typecheck:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Typecheck
+        run: bun buddy test:types
+
+  test:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    services:
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: user
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+
+      dynamodb:
+        image: amazon/dynamodb-local
+        ports:
+          - 8000:8000
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        run: bun install
+
+      - name: Test Suite
+        env:
+          AWS_DYNAMODB_ENDPOINT: http://localhost:8000
+        run: bun --filter='./storage/framework/core/*' test
+
+  release-check:
+    runs-on: ubuntu-latest
+
+    outputs:
+      contains_release: ${{ steps.check_release.outputs.contains_release }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Release Check
+        id: check_release
+        run: |
+          echo "CONTAINS_RELEASE=$(git log --format=%B -n 1 ${{ github.event.after }} | grep -ci 'release')" >> $GITHUB_ENV
+          echo "contains_release=${{ env.CONTAINS_RELEASE }}" >> $GITHUB_OUTPUT
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.check_commit_message.outputs.contains_release == '0'
+    needs: [lint, typecheck, test]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        run: bun install
+
+      # set the .env file
+      - name: Ensure .env Set
+        run: |
+          cp .env.example .env
+
+      - name: Deploy
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: bun buddy deploy production
+
+  deploy-stage:
+    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || (startsWith(github.ref, 'refs/tags/') && contains(github.ref, '-beta.'))
+    needs: [lint, typecheck, test, deploy-prod, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        run: bun install
+
+  deploy-dev:
+    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    needs: [lint, typecheck, test, deploy-prod]
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install Dependencies
+        run: bun install

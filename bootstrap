@@ -1,0 +1,66 @@
+#!/bin/sh
+
+## To learn more, visit https://stacksjs.org/docs/guide/bootstrap
+
+if [ -n "$1" ]; then
+  # Check if the directory exists
+  if [ -d "storage/framework/core" ]; then # determines whether we are in a Stacks context
+    :
+  else
+    if [ -d "$1" ]; then
+      echo "Project $1 exists locally. Please use a different name & run again."
+      exit 1
+    else
+      git clone https://github.com/stacksjs/stacks.git $1
+      cd "$1" || exit 1
+
+      # Run the pkgx-install script (in case it’s already installed, it will be updated to the latest version)
+      "./storage/framework/scripts/pkgx-install"
+
+      echo "Project $1 has been created. Please open a new terminal, run 'bun run dev' to start the server."
+
+      exit 1
+    fi
+  fi
+fi
+
+# Get the directory of the current script and go up 3 directories
+PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+CLI_PATH="$PROJECT_ROOT/storage/framework/core/buddy/src/cli.ts"
+SCRIPT_PATH="$PROJECT_ROOT/storage/framework/scripts/pkgx-install"
+LOG_PATH="$PROJECT_ROOT/storage/logs/console.log"
+
+case "$*" in
+  *--verbose*)
+    echo "Project root: $PROJECT_ROOT"
+    echo "CLI path: $CLI_PATH"
+    echo "Script path: $SCRIPT_PATH"
+    echo "Log path: $LOG_PATH"
+    ;;
+  *)
+esac
+
+cd "$PROJECT_ROOT" || exit 1
+# Run the pkgx-install script
+case "$*" in
+  *--verbose*)
+    "$SCRIPT_PATH"
+    # bun --bun ./storage/framework/core/buddy/src/cli.ts setup --verbose
+    ;;
+  *)
+    "$SCRIPT_PATH" > /dev/null 2>&1
+    # bun --bun ./storage/framework/core/buddy/src/cli.ts setup
+    ;;
+esac
+
+# Create a named pipe
+mkfifo /tmp/pipe
+
+# Run the command, send output to both the console and the pipe
+bun --bun "$CLI_PATH" setup | tee /tmp/pipe &
+
+# Read from the pipe, add timestamps, and append to the file
+while IFS= read -r line; do echo "$(date '+[%Y-%m-%d %H:%M:%S]') $line"; done < /tmp/pipe >> "$LOG_PATH"
+
+# Remove the named pipe
+rm /tmp/pipe
