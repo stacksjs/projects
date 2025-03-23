@@ -9,8 +9,25 @@ defineOptions({
 const currentYear = new Date().getFullYear()
 const isDarkMode = useLocalStorage('isDarkMode', true)
 
+// Define project interface
+interface Project {
+  name: string;
+  url: string;
+  description: string;
+  tags: string[];
+}
+
 // Group data
-const apps = [
+const frameworks: Project[] = [
+  {
+    name: 'Stacks',
+    url: 'https://github.com/stacksjs/stacks',
+    description: 'Modern full-stack framework. Develop powerful apps, clouds & framework-agnostic libraries—faster.',
+    tags: ['Framework', 'TypeScript', 'Full-Stack']
+  }
+]
+
+const apps: Project[] = [
   {
     name: 'Barista',
     url: 'https://github.com/stacksjs/barista',
@@ -31,7 +48,7 @@ const apps = [
   }
 ]
 
-const libraries = [
+const libraries: Project[] = [
   { name: 'audiox', url: 'https://github.com/stacksjs/audiox', description: 'Powerful audio processing for your workflows.', tags: ['Audio', 'Processing'] },
   { name: 'buddy', url: 'https://github.com/stacksjs/buddy', description: 'The Stacks CLI.', tags: ['CLI', 'Tool'] },
   { name: 'bun-git-hooks', url: 'https://github.com/stacksjs/bun-git-hooks', description: 'A simple git hooks manager for all-sized Bun projects.', tags: ['Git', 'Hooks', 'Bun'] },
@@ -62,7 +79,7 @@ const libraries = [
   { name: 'vidx', url: 'https://github.com/stacksjs/vidx', description: 'Make your videos load faster. A better save for the web.', tags: ['Video', 'Optimization'] }
 ]
 
-const plugins = [
+const plugins: Project[] = [
   { name: 'bun-plugin-auto-imports', url: 'https://github.com/stacksjs/bun-plugin-auto-imports', description: 'Auto Imports support for Bun.', tags: ['Bun', 'Plugin', 'Auto-imports'] },
   { name: 'bun-plugin-dotenvx', url: 'https://github.com/stacksjs/bun-plugin-dotenvx', description: 'A Bun plugin to seamlessly work with dotenvx.', tags: ['Bun', 'Plugin', 'Dotenv'] },
   { name: 'bun-plugin-dtsx', url: 'https://github.com/stacksjs/bun-plugin-dtsx', description: 'Automatically generate your TypeScript DTS files, using Bun\'s bundler.', tags: ['Bun', 'Plugin', 'TypeScript'] },
@@ -72,7 +89,7 @@ const plugins = [
   { name: 'vite-plugin-local', url: 'https://github.com/stacksjs/vite-plugin-local', description: 'Pretty development URLs, and HTTPS. Zero config, zero setup.', tags: ['Vite', 'Plugin', 'HTTPS'] }
 ]
 
-const templates = [
+const templates: Project[] = [
   { name: 'projects', url: 'https://github.com/stacksjs/projects', description: 'A minimal personal portfolio template.', tags: ['Template', 'Portfolio'] },
   { name: 'ts-starter', url: 'https://github.com/stacksjs/ts-starter', description: 'A rather barebones Bun & TypeScript starting point for libraries & CLIs.', tags: ['Template', 'Starter', 'TypeScript'] }
 ]
@@ -89,9 +106,9 @@ const featureList = [
 ]
 
 // Get all unique tags for tag cloud
-const allProjects = [...apps, ...libraries, ...plugins, ...templates]
+const allProjects = [...frameworks, ...apps, ...libraries, ...plugins, ...templates]
 const allTags = computed(() => {
-  const tagSet = new Set()
+  const tagSet = new Set<string>()
 
   // If a type is selected, only show tags from projects of that type
   const projectsToConsider = selectedType.value
@@ -123,7 +140,8 @@ const filteredProjects = computed(() => {
 })
 
 // To identify project category
-const getProjectType = (project) => {
+const getProjectType = (project: Project): string => {
+  if (frameworks.includes(project)) return 'Framework'
   if (apps.includes(project)) return 'App'
   if (libraries.includes(project)) return 'Library'
   if (plugins.includes(project)) return 'Plugin'
@@ -132,7 +150,10 @@ const getProjectType = (project) => {
 }
 
 // Get all unique project types
-const projectTypes = computed(() => ['App', 'Library', 'Plugin', 'Template'])
+const projectTypes = computed(() => ['Framework', 'App', 'Library', 'Plugin', 'Template'])
+
+// Get stacks framework
+const stacksFramework = computed(() => frameworks[0])
 
 useHead({
   title: 'Projects | Chris Breuer',
@@ -162,10 +183,17 @@ useHead({
           <h2 class="text-2xl font-bold mb-6 font-mono">## Stacks</h2>
 
           <p class="mb-6">
-            Discover the power of Stacks, a modern web application framework developed in TypeScript. Our philosophy
-            centers around crafting an exceptional DX, one that empowers developers to build world-class web
-            applications, libraries, and endlessly scalable clouds.
+            Modern full-stack framework. Develop powerful apps, clouds & framework-agnostic libraries—faster.
           </p>
+
+          <div class="mb-4">
+            <a href="https://github.com/stacksjs/stacks" target="_blank" rel="noopener"
+              :class="isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'"
+              class="transition-colors duration-200 inline-flex items-center">
+              View on GitHub
+              <span class="ml-1">→</span>
+            </a>
+          </div>
 
           <div class="mb-8 space-y-2 pl-4">
             <div v-for="(feature, index) in featureList" :key="index" class="flex items-baseline py-1">
