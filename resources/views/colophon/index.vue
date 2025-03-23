@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 
 defineOptions({
   name: 'ColophonPage',
 })
 
-const currentYear = new Date().getFullYear()
-const buildTimestamp = new Date().toISOString()
 const isDarkMode = useLocalStorage('isDarkMode', true)
 
 useHead({
@@ -230,9 +227,6 @@ useHead({
       </div>
 
       <div class="mt-12">
-        <p class="italic" :class="isDarkMode ? 'text-gray-400' : 'text-gray-500'">
-          Last built at {{ buildTimestamp }}
-        </p>
       </div>
     </main>
 
