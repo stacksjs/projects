@@ -176,7 +176,7 @@ useHead({
         </div>
 
         <div>
-          <h2 class="text-2xl font-bold mb-6 font-mono">## Key Features</h2>
+          <h2 class="text-xl font-bold mb-6 font-mono">### Key Features</h2>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="p-6 rounded-lg" :class="isDarkMode ? 'bg-gray-800' : 'bg-gray-100'">
