@@ -130,6 +130,26 @@ useHead({
         </p>
       </div>
 
+            <!-- Tag Cloud (moved below posts) -->
+      <div class="mt-16 mb-10">
+        <h2 class="text-2xl font-bold mb-6 font-mono">## Tags</h2>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="tag in allTags"
+            :key="tag"
+            @click="selectTag(tag)"
+            class="px-3 py-1 text-sm rounded-full transition-colors duration-200"
+            :class="[
+              selectedTag === tag
+                ? (isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-800 text-white')
+                : (isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300')
+            ]"
+          >
+            {{ tag }} <span v-if="selectedTag === tag" class="ml-1">×</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Posts List -->
       <div class="space-y-12">
         <div v-if="paginatedPosts.length === 0" class="py-10 text-center">
@@ -184,26 +204,6 @@ useHead({
           Next
         </button>
         <div v-else class="px-4 py-2"></div>
-      </div>
-
-      <!-- Tag Cloud (moved below posts) -->
-      <div class="mt-16 mb-10">
-        <h2 class="text-2xl font-bold mb-6 font-mono">## Tags</h2>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="tag in allTags"
-            :key="tag"
-            @click="selectTag(tag)"
-            class="px-3 py-1 text-sm rounded-full transition-colors duration-200"
-            :class="[
-              selectedTag === tag
-                ? (isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-800 text-white')
-                : (isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300')
-            ]"
-          >
-            {{ tag }} <span v-if="selectedTag === tag" class="ml-1">×</span>
-          </button>
-        </div>
       </div>
 
       <div class="mt-16">
