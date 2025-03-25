@@ -70,7 +70,7 @@ useHead({
                   class="transition-colors duration-200"
                 >
                   Vue.js
-                </a> - A progressive JavaScript framework
+                </a> - A progressive JavaScript framework powering the UI engine
               </span>
             </li>
             <li class="flex items-baseline">
@@ -83,7 +83,7 @@ useHead({
                   :class="isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'"
                   class="transition-colors duration-200"
                 >
-                  Tailwind CSS
+                  UnoCSS
                 </a> - A utility-first CSS framework
               </span>
             </li>
@@ -99,20 +99,6 @@ useHead({
                 >
                   TypeScript
                 </a> - JavaScript with syntax for types
-              </span>
-            </li>
-            <li class="flex items-baseline">
-              <span :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'" class="mr-2">•</span>
-              <span>
-                <a
-                  href="https://pages.cloudflare.com/"
-                  target="_blank"
-                  rel="noopener"
-                  :class="isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'"
-                  class="transition-colors duration-200"
-                >
-                  Cloudflare Pages
-                </a> - For hosting and deployment
               </span>
             </li>
           </ul>

@@ -152,7 +152,12 @@ useHead({
             </li>
             <li class="flex items-baseline">
               <span :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'" class="mr-2">•</span>
-              <span>Barista to keep my menu bar organized</span>
+              <span><a href="https://github.com/stacksjs/barista" target="_blank" rel="noopener"
+                :class="[
+                  isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black',
+                  'border-b border-dashed',
+                  isDarkMode ? 'border-gray-600 hover:border-gray-400' : 'border-gray-400 hover:border-gray-600'
+                ]">Barista</a> to keep my menu bar organized</span>
             </li>
           </ul>
         </div>

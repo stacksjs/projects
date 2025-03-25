@@ -58,7 +58,7 @@ useHead({
           <p class="mb-6" :class="isDarkMode ? 'text-gray-300' : 'text-gray-700'">
             I spent the last decade-and-some working on personal & private projects, ranging from small apps to large enterprise
             services—which caused my obsession with building scalable & serverless systems. In fact, I dove deep into
-            "data storage & transfer" and "distributed & decentralized compute" techniques these past years.
+            “data storage & transfer” and “distributed & decentralized compute” techniques these past years.
             One of the core reasons I started working on Stacks.
           </p>
         </div>
