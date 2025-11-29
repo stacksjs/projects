@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "stacks",
@@ -847,7 +848,7 @@
         "@iconify-json/carbon": "^1.2.8",
         "@shikijs/vitepress-twoslash": "^3.2.1",
         "@vite-pwa/assets-generator": "^0.2.6",
-        "@vite-pwa/vitepress": "^0.5.3",
+        "@vite-pwa/vitepress": "^1.1.0",
         "unocss": "^66.0.0",
         "unplugin-icons": "^22.1.0",
         "unplugin-vue-components": "^28.4.1",
@@ -2999,7 +3000,7 @@
 
     "@vite-pwa/assets-generator": ["@vite-pwa/assets-generator@0.2.6", "", { "dependencies": { "cac": "^6.7.14", "colorette": "^2.0.20", "consola": "^3.2.3", "sharp": "^0.32.6", "sharp-ico": "^0.1.5", "unconfig": "^0.3.11" }, "bin": { "pwa-assets-generator": "bin/pwa-assets-generator.mjs" } }, "sha512-kK44dXltvoubEo5B+6tCGjUrOWOE1+dA4DForbFpO1rKy2wSkAVGrs8tyfN6DzTig89/QKyV8XYodgmaKyrYng=="],
 
-    "@vite-pwa/vitepress": ["@vite-pwa/vitepress@0.5.3", "", { "peerDependencies": { "@vite-pwa/assets-generator": "^0.2.6", "vite-plugin-pwa": ">=0.20.5 <1" }, "optionalPeers": ["@vite-pwa/assets-generator"] }, "sha512-ZNtBxZhS5Enp66z01gKuovTQzSorIpc6o9FEVwOk7kNivzuc4Q5RB04fcbBI1qqHE67rDmm+XqVQw0nj801gmw=="],
+    "@vite-pwa/vitepress": ["@vite-pwa/vitepress@1.1.0", "", { "peerDependencies": { "@vite-pwa/assets-generator": "^1.0.0", "vite-plugin-pwa": "^1.2.0" }, "optionalPeers": ["@vite-pwa/assets-generator"] }, "sha512-enif5C2JmepS69Ak7PSr6K3Eimsg7VyryZo1Z6NiIPNDnjXFlOqxwBYaq8R/d0M7akArJsjos7KmQnEfNFf5nA=="],
 
     "@vitejs/plugin-vue": ["@vitejs/plugin-vue@5.2.3", "", { "peerDependencies": { "vite": "^5.0.0 || ^6.0.0", "vue": "^3.2.25" } }, "sha512-IYSLEQj4LgZZuoVpdSUCw3dIynTWQgPlaRP6iAvMle4My0HdYwr5g5wQAfwOeHQBmYwEkqF70nRpSilr6PoUDg=="],
 
