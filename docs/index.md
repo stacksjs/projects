@@ -68,5 +68,3 @@ features:
     icon: 🧪
     details: A fast built-in testing framework. Enjoyable support for both unit & feature tests.
 ---
-
-<Home />

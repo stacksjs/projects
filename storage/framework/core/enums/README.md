@@ -12,7 +12,7 @@ Stacks enums.
 bun install -d @stacksjs/enums
 ```
 
-To view the full documentation, please visit [https://stacksjs.org/enums](https://stacksjs.org/enums).
+To view the full documentation, please visit [<https://stacksjs.org/enum>s](https://stacksjs.org/enums).
 
 ## 🧪 Testing
 

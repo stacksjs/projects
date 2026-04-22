@@ -14,7 +14,7 @@ This package contains the shell configuration files for the Stacks framework.
 buddy setup:oh-my-zsh
 ```
 
-To view the full documentation, please visit [https://stacksjs.org/ui](https://stacksjs.org/zsh).
+To view the full documentation, please visit [<https://stacksjs.org/u>i](https://stacksjs.org/zsh).
 
 ## 🧪 Testing
 

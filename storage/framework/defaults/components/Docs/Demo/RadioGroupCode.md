@@ -47,9 +47,9 @@ const selected = ref(plans[0])
               : '',
             checked ? 'bg-sky-900/75 text-white ' : 'bg-white ',
           ]"
-          class="relative flex cursor-pointer rounded-lg px-5 py-4 shadow-md focus:outline-none"
+          class="flex relative px-5 py-4 rounded-lg focus:outline-none shadow-md cursor-pointer"
         >
-          <div class="w-full flex items-center justify-between">
+          <div class="flex items-center justify-between w-full">
             <div class="flex items-center">
               <div class="text-sm">
                 <RadioGroupLabel

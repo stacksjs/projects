@@ -235,7 +235,7 @@ await p.tasks([
 
 To view a more detailed example, check out [Buddy](../../buddy/).
 
-_You may also use any of the following CLI utilities:_
+*You may also use any of the following CLI utilities:*
 
 ```js
 import {
@@ -286,7 +286,7 @@ import {
 log.info(`hello ${bold(italic('world'))}`)
 ```
 
-To view the full documentation, please visit [https://stacksjs.org/cli](https://stacksjs.org/cli).
+To view the full documentation, please visit [<https://stacksjs.org/cl>i](https://stacksjs.org/cli).
 
 ## 🧪 Testing
 
