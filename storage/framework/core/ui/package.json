@@ -69,7 +69,7 @@
     "bun-plugin-unocss": "^0.1.2",
     "chart.js": "^4.4.8",
     "pinia": "^3.0.1",
-    "unhead": "^1.11.20",
+    "unhead": "^3.0.5",
     "unocss": "66.0.0",
     "unocss-preset-primitives": "0.0.2-beta.1",
     "vite-plugin-vue-layouts": "^0.11.0",
