@@ -395,7 +395,7 @@
     "@stacksjs/storage": "workspace:*",
     "@stacksjs/strings": "workspace:*",
     "@stacksjs/testing": "workspace:*",
-    "@stacksjs/tlsx": "^0.10.0",
+    "@stacksjs/tlsx": "^0.13.0",
     "@stacksjs/tunnel": "workspace:*",
     "@stacksjs/types": "workspace:*",
     "@stacksjs/ui": "workspace:*",
