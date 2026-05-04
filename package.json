@@ -80,8 +80,5 @@
     "bun-plugin-dotenvx": "^0.6.4",
     "bun-plugin-yml": "^0.3.1",
     "typescript": "5.8.2"
-  },
-  "overrides": {
-    "unconfig": "0.3.10"
   }
 }
