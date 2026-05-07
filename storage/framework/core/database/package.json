@@ -4,7 +4,9 @@
   "version": "0.70.10",
   "description": "The Stacks database integration.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.org>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/database#readme",
@@ -35,7 +37,10 @@
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
@@ -56,7 +61,6 @@
     "@stacksjs/utils": "workspace:*",
     "@types/tar": "^6.1.13",
     "debug": "^4.4.0",
-    "kysely-bun-worker": "^0.7.0",
     "mkdirp": "^3.0.1",
     "tar": "^7.4.3"
   }
