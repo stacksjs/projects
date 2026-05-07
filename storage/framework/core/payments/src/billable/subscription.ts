@@ -1,7 +1,8 @@
+import type { UserModel } from '@stacksjs/orm'
 import type Stripe from 'stripe'
-import type { SubscriptionsTable } from '../../../../orm/src/models/Subscription'
-import type { UserModel } from '../../../../orm/src/models/User'
 import { db } from '@stacksjs/database'
+
+type SubscriptionsTable = Record<string, unknown>
 
 import { manageCustomer, managePrice, stripe } from '..'
 
@@ -50,7 +51,7 @@ export const manageSubscription: SubscriptionManager = (() => {
 
     const mergedParams = { ...defaultParams, ...params }
 
-    const subscription = await stripe.subscription.create(mergedParams)
+    const subscription = await stripe.subscriptions.create(mergedParams)
 
     await storeSubscription(user, type, lookupKey, subscription)
 
@@ -61,10 +62,11 @@ export const manageSubscription: SubscriptionManager = (() => {
     user: UserModel,
     type: string,
     lookupKey: string,
+    _params: Partial<Stripe.SubscriptionUpdateParams> = {},
   ): Promise<Stripe.Response<Stripe.Subscription>> {
     const newPrice = await managePrice.retrieveByLookupKey(lookupKey)
 
-    const activeSubscription = await user?.activeSubscription()
+    const activeSubscription = await (user as unknown as { activeSubscription: () => Promise<{ subscription?: { provider_id?: string, id?: number } } | undefined> })?.activeSubscription()
 
     if (!newPrice)
       throw new Error('New price does not exist in Stripe')
@@ -72,9 +74,12 @@ export const manageSubscription: SubscriptionManager = (() => {
     if (!activeSubscription)
       throw new Error('No active subscription for user!')
 
-    const subscriptionId = activeSubscription.subscription?.provider_id || ''
+    const subscriptionId = activeSubscription.subscription?.provider_id
+    if (!subscriptionId) {
+      throw new Error('Active subscription has no provider ID')
+    }
 
-    const subscription = await stripe.subscription.retrieve(subscriptionId)
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
     if (!subscription) {
       throw new Error('Subscription does not exist in Stripe')
@@ -86,14 +91,25 @@ export const manageSubscription: SubscriptionManager = (() => {
       throw new Error('No subscription items found in the subscription')
     }
 
-    await stripe.subscriptionItems.update(subscriptionItemId, {
-      price: newPrice.id,
-      quantity: 1,
+    // Update via the parent subscription so we can pass proration_behavior.
+    // Without create_prorations, switching mid-cycle either (a) charges
+    // the full new price immediately while still inside the previous
+    // billing period, or (b) bills the new price at the next renewal
+    // with no credit for the partial month — both of which surprise
+    // customers and trigger chargebacks. create_prorations is the
+    // Stripe-recommended default for plan-switch flows.
+    await stripe.subscriptions.update(subscriptionId, {
+      items: [{ id: subscriptionItemId, price: newPrice.id, quantity: 1 }],
+      proration_behavior: 'create_prorations',
     })
 
-    const updatedSubscription = await stripe.subscription.retrieve(subscriptionId)
+    const updatedSubscription = await stripe.subscriptions.retrieve(subscriptionId)
 
-    await updateSubscription(activeSubscription.subscription?.id, type, updatedSubscription)
+    if (!activeSubscription.subscription?.id) {
+      throw new Error('Active subscription has no database ID')
+    }
+
+    await updateSubscription(activeSubscription.subscription.id, type, updatedSubscription)
 
     return updatedSubscription
   }
@@ -102,13 +118,13 @@ export const manageSubscription: SubscriptionManager = (() => {
     subscriptionId: string,
     params?: Partial<Stripe.SubscriptionCancelParams>,
   ): Promise<Stripe.Response<Stripe.Subscription>> {
-    const subscription = await stripe.subscription.retrieve(subscriptionId)
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
     if (!subscription) {
       throw new Error('Subscription does not exist or does not belong to the user')
     }
 
-    const updatedSubscription = await stripe.subscription.cancel(subscriptionId, params)
+    const updatedSubscription = await stripe.subscriptions.cancel(subscriptionId, params)
 
     await updateStoredSubscription(subscriptionId)
 
@@ -120,7 +136,7 @@ export const manageSubscription: SubscriptionManager = (() => {
       throw new Error('Customer does not exist in Stripe')
     }
 
-    const subscription = await stripe.subscription.retrieve(subscriptionId)
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
     return subscription
   }
@@ -129,21 +145,21 @@ export const manageSubscription: SubscriptionManager = (() => {
     await db.updateTable('subscriptions').set({ provider_status: 'canceled' }).where('provider_id', '=', subscriptionId).executeTakeFirst()
   }
 
-  async function isActive(subscription: SubscriptionsTable): Promise<boolean> {
-    return subscription.provider_status === 'active'
+  function isActive(subscription: SubscriptionsTable): boolean {
+    return (subscription as Record<string, unknown>).provider_status === 'active'
   }
 
-  async function isTrial(subscription: SubscriptionsTable): Promise<boolean> {
-    return subscription.provider_status === 'trialing'
+  function isTrial(subscription: SubscriptionsTable): boolean {
+    return (subscription as Record<string, unknown>).provider_status === 'trialing'
   }
 
   async function isIncomplete(user: UserModel, type: string): Promise<boolean> {
-    const subscription = await db.selectFrom('subscriptions').where('type', '=', type).selectAll().executeTakeFirst()
+    const subscription = await db.selectFrom('subscriptions').where('user_id', '=', user.id).where('type', '=', type).selectAll().executeTakeFirst()
 
     if (!subscription)
       return false
 
-    return subscription.provider_status === 'incomplete'
+    return (subscription as Record<string, unknown>).provider_status === 'incomplete'
   }
 
   async function isValid(user: UserModel, type: string): Promise<boolean> {
@@ -152,46 +168,57 @@ export const manageSubscription: SubscriptionManager = (() => {
     if (!subscription)
       return false
 
-    const active = await isActive(subscription)
-    const trial = await isTrial(subscription)
+    const active = await isActive(subscription as unknown as SubscriptionsTable)
+    const trial = await isTrial(subscription as unknown as SubscriptionsTable)
 
     return active || trial
   }
 
-  async function storeSubscription(user: UserModel, type: string, lookupKey: string, options: Stripe.Subscription): Promise<SubscriptionsTable | undefined> {
+  async function storeSubscription(user: UserModel, type: string, _lookupKey: string, options: Stripe.Subscription): Promise<SubscriptionsTable | undefined> {
+    const firstItem = options.items.data[0]
+    if (!firstItem)
+      throw new Error('Stripe subscription contains no line items — cannot store subscription')
+
     const data = removeNullValues({
       user_id: user.id,
       type,
-      unit_price: Number(options.items.data[0].price.unit_amount),
+      unit_price: Number(firstItem.price.unit_amount),
       provider_id: options.id,
       provider_status: options.status,
-      provider_price_id: options.items.data[0].price.id,
-      quantity: options.items.data[0].quantity,
+      provider_price_id: firstItem.price.id,
+      quantity: firstItem.quantity,
       trial_ends_at: options.trial_end != null ? String(options.trial_end) : undefined,
-      ends_at: options.current_period_end != null ? String(options.current_period_end) : undefined,
+      ends_at: (options as unknown as Record<string, unknown>).current_period_end != null ? String((options as unknown as Record<string, unknown>).current_period_end) : undefined,
       provider_type: 'stripe',
-      last_used_at: options.current_period_end != null ? String(options.current_period_end) : undefined,
+      last_used_at: (options as unknown as Record<string, unknown>).current_period_end != null ? String((options as unknown as Record<string, unknown>).current_period_end) : undefined,
     })
 
     const subscriptionModelCreated = await db.insertInto('subscriptions').values(data).executeTakeFirst()
+    if (!subscriptionModelCreated)
+      throw new Error('Failed to insert subscription record')
+
     const subscriptionModel = await db.selectFrom('subscriptions').where('id', '=', Number(subscriptionModelCreated.insertId)).selectAll().executeTakeFirst()
 
-    return subscriptionModel
+    return subscriptionModel as unknown as SubscriptionsTable | undefined
   }
 
   async function updateSubscription(activeSubId: number, type: string, options: Stripe.Subscription): Promise<SubscriptionsTable | undefined> {
     const subscription = await db.selectFrom('subscriptions').where('id', '=', activeSubId).selectAll().executeTakeFirst()
 
+    const firstItem = options.items.data[0]
+    if (!firstItem)
+      throw new Error('Stripe subscription contains no line items — cannot update subscription')
+
     await db?.updateTable('subscriptions')
       .set({
         type,
-        provider_price_id: options.items.data[0].price.id,
-        unit_price: Number(options.items.data[0].price.unit_amount),
+        provider_price_id: firstItem.price.id,
+        unit_price: Number(firstItem.price.unit_amount),
       })
       .where('id', '=', activeSubId)
       .executeTakeFirst()
 
-    return subscription
+    return subscription as unknown as SubscriptionsTable | undefined
   }
 
   function removeNullValues<T extends Record<string, any>>(obj: T): Partial<T> {

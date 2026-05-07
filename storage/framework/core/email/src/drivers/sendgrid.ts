@@ -1,20 +1,23 @@
-import type { EmailAddress, EmailMessage, EmailResult, RenderOptions } from '@stacksjs/types'
+import type { EmailAddress, EmailMessage, EmailResult } from '@stacksjs/types'
 import { Buffer } from 'node:buffer'
 import { config } from '@stacksjs/config'
 import { log } from '@stacksjs/logging'
+import type { TemplateOptions } from '../template'
 import { template } from '../template'
 import { BaseEmailDriver } from './base'
 
 export class SendGridDriver extends BaseEmailDriver {
   public name = 'sendgrid'
-  private apiKey: string
+  private apiKey: string | null = null
 
-  constructor() {
-    super()
-    this.apiKey = config.services.sendgrid?.apiKey ?? ''
+  private getApiKey(): string {
+    if (!this.apiKey) {
+      this.apiKey = config.services.sendgrid?.apiKey ?? ''
+    }
+    return this.apiKey
   }
 
-  public async send(message: EmailMessage, options?: RenderOptions): Promise<EmailResult> {
+  public async send(message: EmailMessage, options?: TemplateOptions): Promise<EmailResult> {
     const logContext = {
       provider: this.name,
       to: message.to,
@@ -35,14 +38,17 @@ export class SendGridDriver extends BaseEmailDriver {
         }
       }
 
+      // Use template HTML if available, otherwise use direct HTML from message
+      const finalHtml = htmlContent || message.html
+
       // Prepare content array based on available content
       const content = []
 
       // Add HTML content if available
-      if (htmlContent) {
+      if (finalHtml) {
         content.push({
           type: 'text/html',
-          value: htmlContent,
+          value: finalHtml,
         })
       }
 
@@ -69,8 +75,8 @@ export class SendGridDriver extends BaseEmailDriver {
           },
         ],
         from: {
-          email: message.from.address || config.email.from?.address,
-          ...(message.from.name && { name: message.from.name }),
+          email: message.from?.address || config.email.from?.address || '',
+          name: message.from?.name || config.email.from?.name,
         },
         content,
         ...(message.attachments && {
@@ -86,7 +92,7 @@ export class SendGridDriver extends BaseEmailDriver {
       }
 
       const response = await this.sendWithRetry(sendgridPayload)
-      return this.handleSuccess(message, response.headers?.['x-message-id'])
+      return this.handleSuccess(message, response.headers?.get('x-message-id') ?? undefined)
     }
     catch (error) {
       return this.handleError(error, message)
@@ -114,7 +120,7 @@ export class SendGridDriver extends BaseEmailDriver {
     const len = bytes.byteLength
 
     for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i])
+      binary += String.fromCharCode(bytes[i] ?? 0)
     }
 
     return typeof btoa === 'function'
@@ -122,12 +128,12 @@ export class SendGridDriver extends BaseEmailDriver {
       : Buffer.from(binary).toString('base64')
   }
 
-  private async sendWithRetry(payload: any, attempt = 1): Promise<any> {
+  private async sendWithRetry(payload: Record<string, unknown>, attempt = 1): Promise<Response> {
     try {
       const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${this.getApiKey()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
@@ -135,14 +141,24 @@ export class SendGridDriver extends BaseEmailDriver {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(`SendGrid API error: ${response.status} - ${JSON.stringify(errorData)}`)
+        const err = new Error(`SendGrid API error: ${response.status} - ${JSON.stringify(errorData)}`) as Error & { status?: number }
+        err.status = response.status
+        throw err
       }
 
       log.info(`[${this.name}] Email sent successfully`, { attempt })
       return response
     }
-    catch (error) {
-      if (attempt < (config.services.sendgrid?.maxRetries ?? 3)) {
+    catch (error: unknown) {
+      // Don't retry deterministic failures. 401/403 mean the API key is
+      // bad or revoked; 400 means the request shape is wrong; 422 means
+      // SendGrid validated the payload as malformed. Retrying any of
+      // those wastes the retry budget and floods their abuse log with
+      // identical bad requests. We DO retry on 5xx, 429 (rate-limited),
+      // and unknown network errors.
+      const status = (error as { status?: number })?.status
+      const nonRetryable = typeof status === 'number' && status >= 400 && status < 500 && status !== 429
+      if (!nonRetryable && attempt < (config.services.sendgrid?.maxRetries ?? 3)) {
         const retryTimeout = config.services.sendgrid?.retryTimeout ?? 1000
         log.warn(`[${this.name}] Email send failed, retrying (${attempt}/${config.services.sendgrid?.maxRetries ?? 3})`)
         await new Promise(resolve => setTimeout(resolve, retryTimeout))

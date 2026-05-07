@@ -7,12 +7,12 @@
  *
  * @example To fire an event, you may use any of the following approaches:
  * ```ts
- * dispatch('user:registered', { name: 'Chris', email: 'chris@stacksjs.org' })
+ * dispatch('user:registered', { name: 'Chris', email: 'chris@stacksjs.com' })
  *
  * // alternatively, you may use the following:
- * useEvent('user:registered', { name: 'Chris', email: 'chris@stacksjs.org' })
- * events.emit('user:registered', { name: 'Chris', email: 'chris@stacksjs.org' })
- * useEvents.emit('user:registered', { name: 'Chris', email: 'chris@stacksjs.org' })
+ * useEvent('user:registered', { name: 'Chris', email: 'chris@stacksjs.com' })
+ * events.emit('user:registered', { name: 'Chris', email: 'chris@stacksjs.com' })
+ * useEvents.emit('user:registered', { name: 'Chris', email: 'chris@stacksjs.com' })
  * ```
  *
  * @example To capture an event, you may use any of the following approaches:
@@ -29,4 +29,9 @@ export interface Events {
   [key: string]: string[]
 }
 
-export * from '../../../types/events'
+// `storage/framework/types/events.ts` is a project-generated declaration
+// (one entry per model: `'<name>:created' | '<name>:updated' | …`). Use
+// `export type *` so Bun erases the import at runtime — the file lives in
+// the consumer project, not in the published `@stacksjs/types` package, so
+// a value-level `export *` would fail to resolve once the package ships.
+export type * from '../../../types/events'

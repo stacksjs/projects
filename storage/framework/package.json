@@ -1,7 +1,7 @@
 {
   "name": "stacks-framework",
   "type": "module",
-  "version": "0.70.10",
+  "version": "0.70.23",
   "private": true,
   "description": "The Stacks framework.",
   "author": "Chris Breuer",
@@ -14,7 +14,7 @@
     "directory": "./storage/framework"
   },
   "scripts": {
-    "dev": "wip: needs to start each dev server (views, api, components, docs, desktop)",
+    "dev": "bun --filter='./core' run buddy dev",
     "build": "bun --filter='./core/*' run build",
     "build:components": "bun --filter='./core/components/*' run build",
     "publish:framework": "./scripts/publish",

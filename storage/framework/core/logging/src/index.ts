@@ -1,145 +1,378 @@
 /* eslint no-console: 0 */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import process from 'node:process'
-import { buddyOptions, stripAnsi } from '@stacksjs/cli'
-import { handleError, writeToLogFile } from '@stacksjs/error-handling'
+import { Logger } from '@stacksjs/clarity'
+import { handleError } from '@stacksjs/error-handling'
 import { ExitCode } from '@stacksjs/types'
-import { consola, createConsola } from 'consola'
 
-// import type { Prompt } from '@stacksjs/cli'
+// Lazy logger initialization to avoid circular dependency with path
+let _logger: Logger | null = null
+let _loggerInitPromise: Promise<void> | null = null
 
-export function logLevel(): number {
-  /**
-   * This regex checks for:
-   *   - --verbose true or --verbose=true exactly at the end of the string ($ denotes the end of the string).
-   *   - --verbose - followed by optional spaces at the end.
-   *   - --verbose followed by optional spaces at the end.
-   *
-   * .trim() is used on options to ensure any trailing spaces in the entire options string do not affect the regex match.
-   */
-  const verboseRegex = /--verbose(?!\s*=\s*false|\s+false)(?:\s+|=true)?(?:$|\s)/
-  const opts = buddyOptions()
-
-  if (verboseRegex.test(opts))
-    return 4
-
-  // const config = await import('@stacksjs/config')
-  // console.log('config', config)
-
-  // return config.logger.level
-  return 3
+// Request context propagation for structured logging
+interface LogContext {
+  requestId?: string
+  userId?: string | number
+  [key: string]: unknown
 }
 
-export const logger: Log = {
-  ...createConsola({
-    level: logLevel(),
-    // fancy: true,
-  }),
-  warning: (message: string) => console.warn(message),
-  dump: (...args: any[]) => console.log(...args),
-  dd: (...args: any[]) => {
-    console.log(...args)
-    process.exit(ExitCode.FatalError)
-  },
-  echo: (message: string) => console.log(message),
+const logContextStorage = new AsyncLocalStorage<LogContext>()
+
+/**
+ * Run a function with an attached log context (e.g., request ID).
+ * Use in HTTP middleware to propagate context through the request lifecycle.
+ */
+export function withLogContext<T>(context: LogContext, fn: () => T): T {
+  return logContextStorage.run(context, fn)
 }
 
-export { consola, createConsola }
+/**
+ * Get the current log context (if any).
+ */
+export function getLogContext(): LogContext | undefined {
+  return logContextStorage.getStore()
+}
 
-type ErrorMessage = string
-export type ErrorOptions =
-  | {
-    shouldExit: boolean
-    silent?: boolean
-    message?: ErrorMessage
+async function initLogger(): Promise<void> {
+  if (_logger) return
+  if (_loggerInitPromise) return _loggerInitPromise
+
+  _loggerInitPromise = (async () => {
+    // Determine format: JSON for production, text for development
+    const format = process.env.LOG_FORMAT || (process.env.NODE_ENV === 'production' ? 'json' : 'text')
+
+    try {
+      // Lazy import path to avoid circular dependency (path imports logging)
+      const p = await import('@stacksjs/path')
+      _logger = new Logger('stacks', {
+        level: (process.env.LOG_LEVEL as any) || 'info',
+        logDirectory: p.projectPath('storage/logs'),
+        showTags: false,
+        fancy: format !== 'json',
+        format: format as any,
+        writeToFile: true,
+      })
+    }
+    catch {
+      // Path not available, use default directory
+      _logger = new Logger('stacks', {
+        level: (process.env.LOG_LEVEL as any) || 'info',
+        logDirectory: 'storage/logs',
+        showTags: false,
+        fancy: format !== 'json',
+        format: format as any,
+        writeToFile: true,
+      })
+    }
+  })()
+
+  return _loggerInitPromise
+}
+
+async function getLogger(): Promise<Logger> {
+  await initLogger()
+  return _logger!
+}
+
+// Helper function to format message for logging, including request context
+function formatMessage(...args: any[]): string {
+  const base = args.map(arg =>
+    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg),
+  ).join(' ')
+
+  // Prepend request ID if available
+  const ctx = logContextStorage.getStore()
+  if (ctx?.requestId) {
+    return `[${ctx.requestId}] ${base}`
   }
-  | any
-  | Error
+
+  return base
+}
 
 export interface Log {
-  info: (...args: any[]) => void
-  success: (msg: string) => void
-  error: (err: string | Error | object | unknown, options?: ErrorOptions) => void
-  warn: (arg: string) => void
-  warning: (arg: string) => void
-  debug: (...args: any[]) => void
-  // prompt: Prompt
-  // start: logger.Start
-  // box: logger.Box
-  // start: any
-  // box: any
-  dump: (...args: any[]) => void
-  dd: (...args: any[]) => void
-  echo: (...args: any[]) => void
+  info: (...args: any[]) => Promise<void>
+  success: (msg: string) => Promise<void>
+  error: (err: string | Error | object | unknown, options?: LogErrorOptions) => Promise<void>
+  warn: (arg: string, options?: Record<string, any>) => Promise<void>
+  warning: (arg: string) => Promise<void>
+  debug: (...args: any[]) => Promise<void>
+  dump: (...args: any[]) => Promise<void>
+  dd: (...args: any[]) => Promise<void>
+  echo: (...args: any[]) => Promise<void>
+  time: (label: string) => (metadata?: Record<string, any>) => Promise<void>
+  /**
+   * Synchronously write to stderr without going through the async file
+   * logger. Use right before `process.exit` — the async `log.warn` /
+   * `log.error` paths return a Promise, and `process.exit` kills the
+   * runtime before that Promise resolves, so the message vanishes.
+   */
+  syncWarn: (msg: string) => void
+  syncError: (msg: string) => void
+  /**
+   * Synchronously print a message to stderr and exit. Wraps the
+   * "log a fatal then die" pattern so callers can't accidentally race
+   * the async logger against `process.exit`.
+   *
+   * @example
+   * if (!options.force) log.fatal('Aborting: clean state required')
+   */
+  fatal: (msg: string, exitCode?: number) => never
+  /**
+   * Await pending async log writes so a subsequent `process.exit` doesn't
+   * truncate the output. Cheap when nothing is buffered.
+   */
+  flush: () => Promise<void>
 }
 
-export interface LogOptions {
-  styled?: boolean
-}
+export type ErrorMessage = string
+
+export type LogErrorOptions = {
+  shouldExit: boolean
+  silent?: boolean
+  message?: ErrorMessage
+} | any | Error
 
 export const log: Log = {
-  info: async (message: string, options?: LogOptions) => {
-    if (options?.styled === false)
-      console.log(message)
-    else logger.info(message)
-    await writeToLogFile(`INFO: ${stripAnsi(message)}`)
+  info: async (...args: any[]) => {
+    const message = formatMessage(...args)
+    const logger = await getLogger()
+    await logger.info(message)
   },
 
-  success: async (message: string, options?: LogOptions) => {
-    if (options?.styled === false)
-      console.log(message)
-    else logger.success(message)
-    await writeToLogFile(`SUCCESS: ${stripAnsi(message)}`)
+  success: async (message: string) => {
+    const logger = await getLogger()
+    await logger.success(message)
   },
 
-  warn: async (message: string, options?: LogOptions) => {
-    if (options?.styled === false)
-      console.log(message)
-    else logger.warn(message)
-    await writeToLogFile(`WARN: ${stripAnsi(message)}`)
+  warn: async (message: string, options?: Record<string, any>) => {
+    const logger = await getLogger()
+    await logger.warn(message, options as any)
   },
 
-  /** alias for `log.warn()`. */
-  warning: async (message: string, options?: LogOptions) => {
-    if (options?.styled === false)
-      console.log(message)
-    else logger.warn(message)
-    await writeToLogFile(`WARN: ${stripAnsi(message)}`)
+  warning: async (message: string) => {
+    const logger = await getLogger()
+    await logger.warn(message)
   },
 
-  error: async (err: string | Error | object | unknown, options?: ErrorOptions) => {
-    handleError(err, options)
+  error: async (err: string | Error | object | unknown, options?: LogErrorOptions | Error | unknown) => {
+    // The second positional has historically been LogErrorOptions, but
+    // every Stacks caller currently passes the *caught* error there
+    // (`log.error('[X] failed:', err)`) — and that variant was silently
+    // dropping the error because it isn't `LogErrorOptions`-shaped.
+    // Detect both shapes: if `options` is an Error or a non-options
+    // object, fold its message + stack into the printed line so action
+    // failures actually reach the dev console.
+    const looksLikeOptions = !!options
+      && typeof options === 'object'
+      && !(options instanceof Error)
+      && ('shouldExit' in (options as object) || 'silent' in (options as object) || 'message' in (options as object))
+
+    let prefix: string
+    if (typeof err === 'string') prefix = err
+    else if (err instanceof Error) prefix = err.stack || err.message
+    else prefix = JSON.stringify(err)
+
+    let suffix = ''
+    if (options !== undefined && !looksLikeOptions) {
+      if (options instanceof Error) suffix = options.stack || options.message
+      else if (typeof options === 'string') suffix = options
+      else {
+        try { suffix = JSON.stringify(options) }
+        catch { suffix = String(options) }
+      }
+    }
+
+    const errorMessage = suffix ? `${prefix} ${suffix}` : prefix
+
+    const logger = await getLogger()
+    await logger.error(errorMessage)
+
+    // Only call handleError if explicitly requested (e.g., fatal errors)
+    // Default behavior: log the error without killing the process
+    if (looksLikeOptions && (options as LogErrorOptions).shouldExit) {
+      handleError(err, options as LogErrorOptions)
+    }
   },
 
   debug: async (...args: any[]) => {
-    const formattedArgs = args.map(arg => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg))
-    const message = `DEBUG: ${formattedArgs.join(' ')}`
-
-    if (process.env.APP_ENV === 'production' || process.env.APP_ENV === 'prod')
-      return writeToLogFile(message)
-
-    logger.debug(message)
-    await writeToLogFile(stripAnsi(message))
+    const message = formatMessage(...args)
+    const logger = await getLogger()
+    await logger.debug(message)
   },
 
-  dump: (...args: any[]) => args.forEach(arg => console.log(arg)),
-  dd: (...args: any[]) => {
-    args.forEach(arg => console.log(arg))
+  dump: async (...args: any[]) => {
+    const message = formatMessage(...args)
+    const logger = await getLogger()
+    // `dump` is the user-facing fire-and-forget debug helper. Awaiting the
+    // write makes sure the message survives a quick `process.exit` after
+    // the call (otherwise the disk transport's pending write gets dropped
+    // and the user sees the dump line vanish).
+    await logger.debug(`DUMP: ${message}`)
+  },
+
+  dd: async (...args: any[]) => {
+    const message = formatMessage(...args)
+    const logger = await getLogger()
+    await logger.error(message)
     process.exit(ExitCode.FatalError)
   },
-  echo: (...args: any[]) => console.log(...args),
+
+  echo: async (...args: any[]) => {
+    const message = formatMessage(...args)
+    const logger = await getLogger()
+    await logger.info(`ECHO: ${message}`)
+  },
+
+  time: (label: string) => {
+    const start = performance.now()
+    return async (metadata?: Record<string, any>) => {
+      const duration = performance.now() - start
+      const logger = await getLogger()
+      const meta = metadata ? ` ${JSON.stringify(metadata)}` : ''
+      await logger.info(`${label}: ${duration.toFixed(2)}ms${meta}`)
+    }
+  },
+
+  syncWarn: (msg: string) => {
+    // Direct stderr write — does not go through the async logger pipeline,
+    // so the byte hits the TTY before the next instruction. Use this
+    // immediately before `process.exit`.
+    process.stderr.write(`${msg}\n`)
+  },
+
+  syncError: (msg: string) => {
+    process.stderr.write(`${msg}\n`)
+  },
+
+  fatal: (msg: string, exitCode = ExitCode.FatalError): never => {
+    process.stderr.write(`${msg}\n`)
+    process.exit(exitCode)
+  },
+
+  flush: async (): Promise<void> => {
+    // If the logger never initialized there's nothing to flush — `getLogger`
+    // would create one we don't need. Same for the init-in-flight case;
+    // those callers already have a Promise to await.
+    if (!_logger && !_loggerInitPromise) return
+    try {
+      const logger = await getLogger()
+      // `clarity`'s Logger exposes a `flush()` for transports that buffer.
+      // It's optional in the type, so we call it dynamically and ignore
+      // the case where the runtime instance doesn't have one.
+      const maybeFlush = (logger as unknown as { flush?: () => Promise<void> }).flush
+      if (typeof maybeFlush === 'function') await maybeFlush.call(logger)
+    }
+    catch {
+      // Best-effort — never let flush fail crash a shutdown path.
+    }
+  },
 }
 
-export function dump(...args: any[]): void {
-  args.forEach(arg => log.debug(arg))
+// Export convenience functions
+export async function dump(...args: any[]): Promise<void> {
+  for (const arg of args) {
+    await log.debug(arg)
+  }
 }
 
-export function dd(...args: any[]): void {
-  log.info(args)
-  // we need to return a non-zero exit code to indicate an error
-  // e.g. if used in a CDK script, we want it to fail the deployment
+export async function dd(...args: any[]): Promise<never> {
+  // Use console directly to guarantee output before exit
+  const message = formatMessage(...args)
+  console.log(message)
   process.exit(ExitCode.FatalError)
 }
 
-export function echo(...args: any[]): void {
-  console.log(...args)
+export async function echo(...args: any[]): Promise<void> {
+  await log.debug(...args)
 }
+
+// Export logger getter for debugging
+export { getLogger as logger }
+
+/**
+ * Structured logging shorthands for common framework events.
+ *
+ * The bare `log.info("…")` form is good for ad-hoc messages, but the
+ * framework emits a predictable set of events (HTTP requests, DB
+ * queries, queued jobs, cache operations) that benefit from a stable
+ * shape so downstream log shippers can index on consistent field
+ * names.
+ *
+ * Each helper:
+ *   1. Attaches the current trace id (if any) automatically
+ *   2. Picks the appropriate severity based on outcome
+ *   3. Emits a consistent JSON shape in production (`event`, `level`,
+ *      `traceId`, …) while keeping the human-readable form in dev
+ *
+ * Helpers are batched onto `log.struct` so they don't pollute the
+ * top-level `log` namespace, and so users can opt out by routing
+ * `log.struct` to a custom transport in tests.
+ */
+interface StructuredFields { [key: string]: unknown }
+
+function emit(level: 'debug' | 'info' | 'warn' | 'error', event: string, fields: StructuredFields): void {
+  const ctx = getLogContext()
+  const payload = {
+    event,
+    traceId: ctx?.requestId,
+    ...fields,
+  }
+  // The underlying logger handles the dev vs prod formatting; we just
+  // pass a single object so it prints as JSON in prod and as a
+  // pretty key=value pairs view in dev. `warn` is typed as
+  // `(string, options?)` so we serialise the payload before handing off.
+  if (level === 'warn') {
+    void log.warn(`[${event}]`, payload)
+  }
+  else {
+    void log[level](payload)
+  }
+}
+
+export const struct = {
+  /**
+   * HTTP request completed. `status` is the response status code,
+   * `durationMs` the wall time from request start to response sent.
+   */
+  request(method: string, path: string, status: number, durationMs: number, fields: StructuredFields = {}): void {
+    const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info'
+    emit(level, 'http.request', { method, path, status, durationMs, ...fields })
+  },
+
+  /**
+   * Database query completed. `durationMs` is the wall time at the
+   * driver boundary.
+   */
+  query(sql: string, durationMs: number, fields: StructuredFields = {}): void {
+    emit('debug', 'db.query', { sql, durationMs, ...fields })
+  },
+
+  /**
+   * A slow query (over the slow-threshold) — emits at warn so it
+   * surfaces in the default log filter.
+   */
+  slowQuery(sql: string, durationMs: number, fields: StructuredFields = {}): void {
+    emit('warn', 'db.slow_query', { sql, durationMs, ...fields })
+  },
+
+  /**
+   * Queue job lifecycle event. `phase` is `'started' | 'succeeded' |
+   * 'failed' | 'released'`.
+   */
+  job(name: string, phase: 'started' | 'succeeded' | 'failed' | 'released', fields: StructuredFields = {}): void {
+    const level = phase === 'failed' ? 'error' : 'info'
+    emit(level, `job.${phase}`, { jobName: name, ...fields })
+  },
+
+  /**
+   * Cache hit/miss event for warm-path debugging.
+   */
+  cache(op: 'hit' | 'miss' | 'set' | 'del', key: string, fields: StructuredFields = {}): void {
+    emit('debug', `cache.${op}`, { key, ...fields })
+  },
+}
+
+// Hang the structured surface off the canonical `log` export so consumers
+// can do `log.struct.request(...)`. The mutation is safe because `log`
+// is a singleton object literal we own.
+;(log as Log & { struct: typeof struct }).struct = struct

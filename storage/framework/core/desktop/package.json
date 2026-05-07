@@ -1,10 +1,12 @@
 {
   "name": "@stacksjs/desktop",
   "type": "module",
-  "version": "0.70.10",
+  "version": "0.70.23",
   "description": "The Stacks Desktop engine.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/desktop#readme",
@@ -31,15 +33,21 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "dev": "bunx --bun vite ../../dashboard -c ../vite-config/src/desktop.ts",
     "dev:app": "tauri dev",
@@ -51,13 +59,7 @@
   },
   "devDependencies": {
     "@stacksjs/build": "workspace:*",
-    "@stacksjs/development": "workspace:*",
-    "@stacksjs/server": "workspace:*",
-    "@tauri-apps/api": "^1.6.0",
-    "@tauri-apps/cli": "^1.6.3",
-    "@types/d3": "^7.4.3",
-    "d3": "^7.9.0",
-    "unified-network": "^0.6.4",
-    "vue": "^3.5.13"
+    "better-dx": "^0.2.12",
+    "@stacksjs/server": "workspace:*"
   }
 }

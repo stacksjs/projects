@@ -1,11 +1,11 @@
 {
   "name": "@stacksjs/query-builder",
   "type": "module",
-  "version": "0.70.10",
+  "version": "0.70.23",
   "description": "The Stacks Query Builder integration",
   "author": "Chris Breuer",
   "contributors": [
-    "Chris Breuer <chris@stacksjs.org>"
+    "Chris Breuer <chris@stacksjs.com>"
   ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
@@ -19,13 +19,18 @@
     "url": "https://github.com/stacksjs/stacks/issues"
   },
   "keywords": [
-    "stacks"
+    "stacks",
+    "query-builder",
+    "bun"
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
@@ -42,10 +47,10 @@
   },
   "devDependencies": {
     "@stacksjs/database": "workspace:*",
-    "@stacksjs/development": "workspace:*",
-    "@stacksjs/types": "workspace:*",
-    "@types/pg": "^8.11.11",
-    "mysql2": "^3.14.0",
-    "pg": "^8.14.1"
+    "better-dx": "^0.2.12",
+    "@stacksjs/types": "workspace:*"
+  },
+  "dependencies": {
+    "bun-query-builder": "^0.1.16"
   }
 }

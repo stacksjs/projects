@@ -1,28 +1,25 @@
-import type { EmailMessage, EmailResult, RenderOptions } from '@stacksjs/types'
-import { SendEmailCommand, SES } from '@aws-sdk/client-ses'
+import type { EmailMessage, EmailResult } from '@stacksjs/types'
+import { SESClient } from '@stacksjs/ts-cloud'
 import { config } from '@stacksjs/config'
+import type { TemplateOptions } from '../template'
 import { template } from '../template'
 import { BaseEmailDriver } from './base'
 
 export class SESDriver extends BaseEmailDriver {
   public name = 'ses'
-  private client: SES
+  private client: SESClient | null = null
 
-  constructor() {
-    super()
-
-    const credentials = {
-      accessKeyId: config.services.ses?.credentials?.accessKeyId ?? '',
-      secretAccessKey: config.services.ses?.credentials?.secretAccessKey ?? '',
+  private getClient(): SESClient {
+    if (!this.client) {
+      this.client = new SESClient(
+        config?.services?.ses?.region || 'us-east-1',
+      )
     }
 
-    this.client = new SES({
-      region: config.services.ses?.region || 'us-east-1',
-      credentials,
-    })
+    return this.client
   }
 
-  public async send(message: EmailMessage, options?: RenderOptions): Promise<EmailResult> {
+  public async send(message: EmailMessage, options?: TemplateOptions): Promise<EmailResult> {
     try {
       this.validateMessage(message)
 
@@ -35,31 +32,40 @@ export class SESDriver extends BaseEmailDriver {
         }
       }
 
-      const messageBody: any = {}
+      // Use template HTML if available, otherwise use direct HTML from message
+      const finalHtml = htmlContent || message.html
+
+      const body: {
+        Text?: { Data: string, Charset?: string }
+        Html?: { Data: string, Charset?: string }
+      } = {}
 
       // Add HTML content if available
-      if (htmlContent) {
-        messageBody.Html = {
+      if (finalHtml) {
+        body.Html = {
           Charset: config.email.charset || 'UTF-8',
-          Data: htmlContent,
+          Data: finalHtml,
         }
       }
 
       // Add text content if available
       if (message.text) {
-        messageBody.Text = {
+        body.Text = {
           Charset: config.email.charset || 'UTF-8',
           Data: message.text,
         }
       }
 
       // If no content was added, throw an error
-      if (Object.keys(messageBody).length === 0) {
+      if (Object.keys(body).length === 0) {
         throw new Error('Email must have either HTML or text content')
       }
 
-      const params = {
-        Source: message.from?.address || config.email.from?.address,
+      const result = await this.getClient().sendEmail({
+        FromEmailAddress: this.formatSourceAddress({
+          address: message.from?.address || config.email.from?.address || '',
+          name: message.from?.name || config.email.from?.name,
+        }),
 
         Destination: {
           ToAddresses: this.formatAddresses(message.to),
@@ -67,21 +73,38 @@ export class SESDriver extends BaseEmailDriver {
           BccAddresses: this.formatAddresses(message.bcc),
         },
 
-        Message: {
-          Body: messageBody,
-          Subject: {
-            Charset: config.email.charset || 'UTF-8',
-            Data: message.subject,
+        Content: {
+          Simple: {
+            Subject: {
+              Charset: config.email.charset || 'UTF-8',
+              Data: message.subject,
+            },
+            Body: body,
           },
         },
-      }
+      })
 
-      const response = await this.client.send(new SendEmailCommand(params))
-      return this.handleSuccess(message, response.MessageId)
+      return this.handleSuccess(message, result.MessageId)
     }
     catch (error) {
       return this.handleError(error, message)
     }
+  }
+
+  private formatSourceAddress(from: { address: string, name?: string }): string {
+    return from.name ? `${from.name} <${from.address}>` : from.address
+  }
+
+  protected formatAddresses(addresses: string | string[] | { address: string, name?: string }[] | undefined): string[] {
+    if (!addresses)
+      return []
+
+    if (typeof addresses === 'string')
+      return [addresses]
+
+    return addresses.map(addr =>
+      typeof addr === 'string' ? addr : addr.address,
+    )
   }
 }
 

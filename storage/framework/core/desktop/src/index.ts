@@ -1,43 +1,53 @@
-import * as app from '@tauri-apps/api/app'
-
-import * as clipboard from '@tauri-apps/api/clipboard'
-import * as dialog from '@tauri-apps/api/dialog'
-import * as event from '@tauri-apps/api/event'
-import * as fs from '@tauri-apps/api/fs'
-import * as globalShortcut from '@tauri-apps/api/globalShortcut'
-import * as http from '@tauri-apps/api/http'
-import * as mocks from '@tauri-apps/api/mocks'
-import * as notification from '@tauri-apps/api/notification'
-import * as os from '@tauri-apps/api/os'
-import * as path from '@tauri-apps/api/path'
-import * as process from '@tauri-apps/api/process'
-import { open as shellOpen } from '@tauri-apps/api/shell'
-import * as shell from '@tauri-apps/api/shell'
-import * as tauri from '@tauri-apps/api/tauri'
-import * as updater from '@tauri-apps/api/updater'
-import * as window from '@tauri-apps/api/window'
-
-export const desktop = {
-  app,
-  event,
-  clipboard,
-  dialog,
-  fs,
-  globalShortcut,
-  http,
-  mocks,
-  notification,
-  os,
-  path,
-  process,
-  shell,
-  tauri,
-  updater,
-  window,
+export interface Desktop {
+  app: unknown
+  core: unknown
+  dpi: unknown
+  event: unknown
+  image: unknown
+  menu: unknown
+  mocks: unknown
+  path: unknown
+  tray: unknown
+  webview: unknown
+  webviewWindow: unknown
+  window: unknown
 }
 
-export async function openShell(link: string) {
-  await shellOpen(link)
+// let _desktop: Desktop | undefined
+
+// export async function getDesktop(): Promise<Desktop> {
+//   if (_desktop) return _desktop
+
+//   const tauri = await import('@tauri-apps/api')
+//   _desktop = {
+//     app: tauri.app,
+//     core: tauri.core,
+//     dpi: tauri.dpi,
+//     event: tauri.event,
+//     image: tauri.image,
+//     menu: tauri.menu,
+//     mocks: tauri.mocks,
+//     path: tauri.path,
+//     tray: tauri.tray,
+//     webview: tauri.webview,
+//     webviewWindow: tauri.webviewWindow,
+//     window: tauri.window,
+//   }
+
+//   return _desktop
+// }
+
+export interface OpenDevWindowOptions {
+  title?: string
+  width?: number
+  height?: number
+  darkMode?: boolean
+  hotReload?: boolean
+  nativeSidebar?: boolean
+  sidebarWidth?: number
+  sidebarConfig?: unknown
 }
 
-export * from './system-tray'
+export async function openDevWindow(_port: number, _options?: OpenDevWindowOptions): Promise<boolean> {
+  return false
+}

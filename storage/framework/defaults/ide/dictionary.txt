@@ -35,7 +35,9 @@ brotli
 browserslist
 bumpp
 bundleconfig
+bunfig
 bunnel
+bunpress
 bunx
 bunx --bun
 cardano
@@ -75,6 +77,7 @@ cryptojs
 cssnano
 cssnanorc
 customresources
+cwcss
 czrc
 dangerfile
 datetime
@@ -104,7 +107,6 @@ Doyon
 dprint
 Drasner
 dtsx
-ecommerce
 edgelambda
 elasticloadbalancingv
 elbv
@@ -134,7 +136,6 @@ fullscreen
 gamepad
 geolocation
 Germaine
-Ghostty
 giget
 gitmessage
 gitmodules
@@ -145,13 +146,14 @@ gstatic
 gupshup
 gzipped
 headlessui
+crosswind
 heex
 heroicon
 heroicons
 highlightjs
 hookable
 htmlnanorc
-httpie
+httx
 hubot
 hugeicons
 huggingface
@@ -280,6 +282,7 @@ resx
 retriable
 rimraf
 roadmap
+rolldown
 Runtimes
 rustfmt
 safelist
@@ -353,11 +356,11 @@ unhead
 unimport
 universalify
 unmanaged
-unocss
 unplugin
 Unprefix
 Unprefixed
 unstorage
+untap
 Untimed
 Updateable
 upstash
@@ -387,7 +390,6 @@ wafv
 Waitlist
 webfont
 weboutlook
-Webstorm
 whois
 wmaurer
 xiaoluoboding

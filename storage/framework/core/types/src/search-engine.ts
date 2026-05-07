@@ -37,16 +37,10 @@ export interface SearchEngineOptions {
    *
    * The search engine to utilize.
    *
-   * @default string 'opensearch'
-   * @see https://stacksjs.org/docs/search-engine
+   * @default string 'meilisearch'
+   * @see https://stacksjs.com/docs/search-engine
    */
-  driver: 'opensearch'
-  // driver: 'meilisearch' | 'algolia' | 'typesense' | 'opensearch' wip
-
-  // meilisearch?: {
-  //   host: string
-  //   apiKey: string
-  // }
+  driver: 'meilisearch' | 'algolia' | 'opensearch'
 
   opensearch?: {
     host: string
@@ -57,10 +51,16 @@ export interface SearchEngineOptions {
 
   meilisearch?: {
     host: string
-    protocol: number
-    port: number
-    auth: string
+    protocol?: number
+    port?: number
+    auth?: string
     apiKey: string
+  }
+
+  algolia?: {
+    appId: string
+    apiKey: string
+    searchOnlyApiKey?: string
   }
 
   filters?: {
@@ -79,6 +79,7 @@ export type SearchEngineConfig = Partial<SearchEngineOptions>
 
 export interface SearchEngineDriver {
   client: () => MeiliSearch
+  resetClient?: () => void
 
   search: (index: string, params: any) => Promise<SearchResponse<Record<string, any>>>
 
@@ -116,7 +117,6 @@ export interface SearchEngineDriver {
   getSettings: (index: string) => Promise<Settings>
   updateSettings: (index: string, settings: Settings) => Promise<EnqueuedTask>
   resetSettings: (index: string) => Promise<EnqueuedTask>
-  å
   getPagination: (index: string) => Promise<PaginationSettings>
   updatePagination: (index: string, pagination: PaginationSettings) => Promise<EnqueuedTask>
   resetPagination: (index: string) => Promise<EnqueuedTask>

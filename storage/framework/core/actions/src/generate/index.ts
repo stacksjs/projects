@@ -1,11 +1,11 @@
 import type { GeneratorOptions } from '@stacksjs/types'
+import * as fs from 'node:fs'
 import process from 'node:process'
-import { generateOpenApi } from '@stacksjs/api'
 import { runCommand } from '@stacksjs/cli'
 import { Action, NpmScript } from '@stacksjs/enums'
 import { log } from '@stacksjs/logging'
-import { generateModelFiles } from '@stacksjs/orm'
-import { frameworkPath, projectPath } from '@stacksjs/path'
+import { frameworkPath, projectPath, storagePath } from '@stacksjs/path'
+import { ExitCode } from '@stacksjs/types'
 import { runNpmScript } from '@stacksjs/utils'
 import { runAction } from '../helpers'
 import { generateVsCodeCustomData as genVsCodeCustomData } from '../helpers/vscode-custom-data'
@@ -27,8 +27,8 @@ export async function invoke(options?: GeneratorOptions): Promise<void> {
     await generateComponentMeta()
   else if (options?.coreSymlink)
     await generateCoreSymlink()
-  else if (options?.modelFiles)
-    await generateModelFiles()
+  // else if (options?.modelFiles)
+  //   await generateModelFiles()
   else if (options?.openApiSpec)
     await generateOpenApiSpec()
 }
@@ -43,9 +43,9 @@ export async function generateLibEntries(options: GeneratorOptions): Promise<voi
     cwd: projectPath(),
   })
 
-  if (result.isErr()) {
+  if (result.isErr) {
     log.error('There was an error generating your library entry points', result.error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   log.success('Library entry points generated successfully')
@@ -54,9 +54,9 @@ export async function generateLibEntries(options: GeneratorOptions): Promise<voi
 export async function generateWebTypes(options?: GeneratorOptions): Promise<void> {
   const result = await runNpmScript(NpmScript.GenerateWebTypes, options)
 
-  if (result.isErr()) {
+  if (result.isErr) {
     log.error('There was an error generating the web-types.json file.', result.error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   log.success('Successfully generated the web-types.json file')
@@ -65,9 +65,9 @@ export async function generateWebTypes(options?: GeneratorOptions): Promise<void
 export async function generateVsCodeCustomData(): Promise<void> {
   const result = await genVsCodeCustomData()
 
-  if (result.isErr()) {
+  if (result.isErr) {
     log.error('There was an error generating the custom-elements.json file.', result.error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   await runAction(Action.LintFix, { verbose: true, cwd: projectPath() }) // because the generated json file needs to be linted
@@ -78,9 +78,9 @@ export async function generateVsCodeCustomData(): Promise<void> {
 export async function generateIdeHelpers(options?: GeneratorOptions): Promise<void> {
   const result = await runNpmScript(NpmScript.GenerateIdeHelpers, options)
 
-  if (result.isErr()) {
+  if (result.isErr) {
     log.error('There was an error generating IDE helpers.', result.error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   await runAction(Action.LintFix, { verbose: true, cwd: projectPath() }) // because the generated json file needs to be linted
@@ -90,9 +90,9 @@ export async function generateIdeHelpers(options?: GeneratorOptions): Promise<vo
 export async function generateComponentMeta(): Promise<void> {
   const result = await genVsCodeCustomData()
 
-  if (result.isErr()) {
+  if (result.isErr) {
     log.error('There was an error generating your component meta information.', result.error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   await runAction(Action.LintFix, { verbose: true, cwd: projectPath() }) // because the generated json file needs to be linted
@@ -105,19 +105,102 @@ export async function generateTypes(options?: GeneratorOptions): Promise<void> {
     ...options,
   })
 
-  if (result.isErr()) {
+  if (result.isErr) {
     log.error('There was an error generating your types.', result.error)
-    process.exit()
+    process.exit(ExitCode.FatalError)
   }
 
   log.success('Types were generated successfully')
 }
 
-export function generatePkgxConfig(): void {
-  // write the yaml string to a file in your project root
-  // files.put(projectPath('./pkgx.yaml'), yamlStr)
+/**
+ * Watch model + config + migration source for changes and re-run
+ * `generateTypes()` whenever any of them change. Debounced at 200ms so
+ * a refactor that touches a dozen files in one save coalesces into a
+ * single regen pass.
+ *
+ * Watched roots:
+ *   - `app/Models/`                                 — userland models
+ *   - `storage/framework/defaults/app/Models/`      — framework defaults
+ *     (Stacks' equivalent of Laravel's vendor/. When you're working on
+ *     the framework itself you edit here and need fresh types just as
+ *     much as a userland edit.)
+ *   - `config/`
+ *   - `database/migrations/`
+ *
+ * `inflight` guards against re-entry: a slow regen shouldn't queue up
+ * three more behind it. `pending` debounces a burst of saves into one
+ * fire. The returned promise only resolves on SIGINT, so the caller
+ * either awaits (blocking, like `generate:types --watch`) or fires it
+ * non-blocking (sidecar use, like `dev:api`).
+ */
+export async function watchTypes(options?: GeneratorOptions): Promise<void> {
+  const watched = [
+    projectPath('app/Models'),
+    storagePath('framework/defaults/app/Models'),
+    projectPath('config'),
+    projectPath('database/migrations'),
+  ]
 
-  log.success('Successfully generated `./pkgx.yaml` based on your config')
+  log.info(`[generate:types --watch] watching ${watched.length} directories`)
+
+  let pending: ReturnType<typeof setTimeout> | null = null
+  let inflight = false
+  const trigger = (): void => {
+    if (pending) clearTimeout(pending)
+    pending = setTimeout(async () => {
+      if (inflight) return
+      inflight = true
+      try {
+        log.info('[generate:types --watch] change detected, regenerating…')
+        await generateTypes(options)
+        log.success('[generate:types --watch] types up to date')
+      }
+      catch (err) {
+        log.error('[generate:types --watch] regeneration failed:', err)
+      }
+      finally {
+        inflight = false
+      }
+    }, 200)
+  }
+
+  const watchers: fs.FSWatcher[] = []
+  for (const dir of watched) {
+    try {
+      if (!fs.existsSync(dir)) continue
+      const w = fs.watch(dir, { recursive: true }, () => trigger())
+      watchers.push(w)
+    }
+    catch (err) {
+      log.warn(`[generate:types --watch] cannot watch ${dir}: ${err}`)
+    }
+  }
+
+  if (watchers.length === 0) {
+    log.warn('[generate:types --watch] no directories to watch — exiting')
+    return
+  }
+
+  // Hold the process open until SIGINT. When dev:api spawns this
+  // fire-and-forget, the parent's SIGINT handler (or a hard kill)
+  // tears down the watchers along with the dev server.
+  await new Promise<void>((resolve) => {
+    process.once('SIGINT', () => {
+      log.info('[generate:types --watch] stopping')
+      for (const w of watchers) {
+        try { w.close() }
+        catch { /* ignore */ }
+      }
+      resolve()
+    })
+  })
+}
+
+export function generatePantryConfig(): void {
+  // write the yaml string to a file in your project root
+  // files.put(projectPath('./pantry.yaml'), yamlStr)
+  log.success('Successfully generated `./pantry.yaml` based on your config')
 }
 
 export async function generateSeeder(): Promise<void> {
@@ -129,6 +212,8 @@ export async function generateCoreSymlink(): Promise<void> {
 }
 
 export async function generateOpenApiSpec(): Promise<void> {
+  // Lazy import to avoid pulling in @stacksjs/router (and bun-router) at module load time
+  const { generateOpenApi } = await import('@stacksjs/api')
   await generateOpenApi()
 
   log.success('Successfully generated Open API Spec')

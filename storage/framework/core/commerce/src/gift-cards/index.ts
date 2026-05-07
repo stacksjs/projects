@@ -1,8 +1,6 @@
 export {
-  bulkRemove,
-  deactivate,
-  remove,
-  removeExpired,
+  bulkDestroy,
+  destroy,
 } from './destroy'
 
 export {
@@ -14,6 +12,8 @@ export {
   fetchByCode,
   fetchById,
   fetchStats,
+  fetchTotalCurrentBalance,
+  fetchTotalValue,
 } from './fetch'
 
 export {

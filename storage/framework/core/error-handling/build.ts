@@ -1,21 +1,21 @@
 import { dts } from 'bun-plugin-dtsx'
-import { intro, outro } from '../build/src'
+import { frameworkExternal, intro, outro } from '../build/src'
 
 const { startTime } = await intro({
   dir: import.meta.dir,
 })
 
+// TODO: ensure browser support works
 const result = await Bun.build({
   entrypoints: ['./src/index.ts'],
   outdir: './dist',
   format: 'esm',
-  target: 'node',
   // sourcemap: 'linked',
   minify: true,
-  external: ['@stacksjs/cli', '@stacksjs/path'],
+  external: frameworkExternal(),
   plugins: [
     dts({
-      root: './src',
+      root: '.',
       outdir: './dist',
     }),
   ],

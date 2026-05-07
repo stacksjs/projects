@@ -1,7 +1,7 @@
 {
   "name": "stacks-server",
   "type": "module",
-  "version": "0.70.10",
+  "version": "0.70.23",
   "description": "The Stacks server.",
   "author": "Chris Breuer",
   "license": "MIT",
@@ -25,7 +25,8 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     },
     "./*": {
       "import": "./dist/*"
@@ -33,7 +34,7 @@
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": ["Chris Breuer <chris@stacksjs.com>"],
   "files": ["README.md", "dist"],
   "scripts": {
     "dev": "docker run -d -p 3000:3000 --name stacks-server --restart unless-stopped stacks",
@@ -41,7 +42,7 @@
     "build": "bun build.ts"
   },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*",
+    "better-dx": "^0.2.5",
     "@stacksjs/logging": "workspace:*",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/router": "workspace:*",

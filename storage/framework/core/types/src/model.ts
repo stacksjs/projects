@@ -1,9 +1,16 @@
 import type { Faker } from '@stacksjs/faker'
+import type { ValidationType } from '@stacksjs/ts-validation'
 import type { ModelNames, TableNames } from '@stacksjs/types'
-import type { VineBoolean, VineNumber, VineString } from '@vinejs/vine'
-import type { DeepPartial, Nullable } from '.'
+import type { DeepPartial } from '.'
 import type { SearchOptions } from './search-engine'
 
+/**
+ * Model definition type - compatible with bun-query-builder
+ *
+ * Models can be defined in app/Models/ (userland; overrides defaults by name)
+ * or storage/framework/defaults/app/Models/ (framework defaults), and are used
+ * to generate the ORM classes, migrations, and API routes.
+ */
 export type Model = Partial<ModelOptions>
 
 export interface BaseRelation {
@@ -51,6 +58,20 @@ export interface BaseHasOneThrough<T = string> {
   relationName?: string
 }
 
+export interface BaseHasManyThrough<T = string> {
+  model: T
+  through: T
+  foreignKey?: string
+  throughForeignKey?: string
+  relationName?: string
+}
+
+export interface HasManyThrough<T = string> extends Array<BaseHasManyThrough<T> | T> {}
+
+export interface MorphToMany<T = string> extends Array<T> {}
+
+export interface MorphedByMany<T = string> extends Array<T> {}
+
 export interface FieldArrayElement {
   entity: string
   charValue?: string | null
@@ -61,11 +82,13 @@ export interface ModelElement {
   field: string
   default: string | number | boolean | Date | undefined | null
   unique: boolean
+  fillable: boolean
+  hidden: boolean
   required: boolean
   fieldArray: FieldArrayElement | null
 }
 
-export interface AuthOptions {
+export interface UserAuthOptions {
   useTwoFactor?: boolean
   usePasskey?: boolean
 }
@@ -80,7 +103,8 @@ type Action = ActionPath | ActionName | undefined
 
 export type ApiRoutes = 'index' | 'show' | 'store' | 'update' | 'destroy'
 
-export type VineType = VineString | VineNumber | VineBoolean | Date | Nullable<any>
+export type SocialProviders = 'google' | 'github' | 'twitter' | 'facebook'
+
 export interface SeedOptions {
   count: number
 }
@@ -89,7 +113,7 @@ type LogAttribute = string
 
 interface ActivityLogOption {
   exclude: LogAttribute[]
-  include: LogAttribute[] // default to “*”
+  include: LogAttribute[] // default to "*"
   logOnly: LogAttribute[]
 }
 
@@ -99,6 +123,8 @@ export interface Relations {
   belongsTo: BelongsTo<ModelNames> | ModelNames[]
   belongsToMany: BelongsToMany<ModelNames> | ModelNames[]
 }
+
+export type SocialOptions = SocialProviders[]
 
 export interface ApiSettings {
   uri: string
@@ -143,6 +169,7 @@ export interface ModelOptions extends Base {
   table?: string // defaults to the lowercase, plural name of the model name (or the name of the model file)
   primaryKey?: string // defaults to `id`
   autoIncrement?: boolean // defaults to true
+  indexes?: CompositeIndex[]
   dashboard?: {
     highlight?: boolean | number // defaults to undefined
   }
@@ -153,12 +180,15 @@ export interface ModelOptions extends Base {
     timestampable?: boolean | TimestampOptions // useTimestamps alias
     useSoftDeletes?: boolean | SoftDeleteOptions // defaults to false
     softDeletable?: boolean | SoftDeleteOptions // useSoftDeletes alias
-
-    useAuth?: boolean | AuthOptions // defaults to false
-    authenticatable?: boolean | AuthOptions // useAuth alias
+    categorizable?: boolean // defaults to false
+    taggable?: boolean // defaults to false
+    commentables?: boolean // defaults to false
+    useAuth?: boolean | UserAuthOptions // defaults to false
+    authenticatable?: boolean | UserAuthOptions // useAuth alias
     useSeeder?: boolean | SeedOptions // defaults to a count of 10
     seedable?: boolean | SeedOptions // useSeeder alias
     useSearch?: boolean | SearchOptions // defaults to false
+    useSocials?: SocialOptions // defaults to false
     searchable?: boolean | SearchOptions // useSearch alias
     useApi?: ApiOptions | boolean
     observe?: string[] | boolean
@@ -181,11 +211,17 @@ export interface ModelOptions extends Base {
 
   hasOneThrough?: HasOneThrough<ModelNames> | ModelNames[]
 
+  hasManyThrough?: HasManyThrough<ModelNames> | ModelNames[]
+
   morphOne?: MorphOne<ModelNames> | ModelNames
 
   morphMany?: MorphMany<ModelNames>[] | ModelNames[]
 
   morphTo?: MorphTo
+
+  morphToMany?: MorphToMany<ModelNames> | ModelNames[]
+
+  morphedByMany?: MorphedByMany<ModelNames> | ModelNames[]
 
   scopes?: {
     [key: string]: (value: any) => any
@@ -204,15 +240,19 @@ export interface Attribute {
   default?: string | number | boolean | Date
   unique?: boolean
   order?: number
-  required?: boolean
   hidden?: boolean
   fillable?: boolean
   guarded?: boolean
   factory?: (faker: Faker) => any
-  validation?: {
-    rule: VineType
+  validation: {
+    rule: ValidationType
     message?: ValidatorMessage
   }
+}
+
+export interface CompositeIndex {
+  name: string
+  columns: string[]
 }
 
 export interface AttributesElements {
@@ -234,3 +274,46 @@ export interface RelationConfig {
   throughForeignKey?: string
   pivotTable: TableNames
 }
+
+/**
+ * Helper to define a model with proper type inference.
+ * Compatible with bun-query-builder's defineModel pattern.
+ *
+ * @example
+ * ```ts
+ * export default defineModel({
+ *   name: 'User',
+ *   table: 'users',
+ *   primaryKey: 'id',
+ *   attributes: {
+ *     name: { validation: { rule: schema.string() } },
+ *     email: { validation: { rule: schema.string().email() }, unique: true },
+ *   },
+ *   traits: {
+ *     useTimestamps: true,
+ *     useApi: true,
+ *   },
+ * })
+ * ```
+ */
+export function defineModel<const T extends Model>(model: T): T {
+  return model
+}
+
+/**
+ * Helper to define multiple models with proper type inference.
+ * Useful for building a typed database schema.
+ *
+ * @example
+ * ```ts
+ * const models = defineModels({ User, Post, Comment })
+ * ```
+ */
+export function defineModels<const T extends Record<string, Model>>(models: T): T {
+  return models
+}
+
+/**
+ * Type alias for a collection of models
+ */
+export type ModelRecord = Record<string, Model>

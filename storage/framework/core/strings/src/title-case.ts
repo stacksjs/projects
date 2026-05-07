@@ -2,8 +2,10 @@
 // for much of this code
 
 const TOKENS = /(\S+)|(.)/g
-const IS_SPECIAL_CASE = /[.#][\p{L}\p{N}]/u // #tag, example.com, etc.
-const IS_MANUAL_CASE = /\p{Ll}(?=\p{Lu})/u // iPhone, iOS, etc.
+// Matches special cases like #tag, example.com, etc.
+const IS_SPECIAL_CASE = /[.#][\p{L}\p{N}]/u
+// Matches camelCase boundaries like iPhone, iOS, etc.
+const IS_MANUAL_CASE = /\p{Ll}(?=\p{Lu})/u
 const ALPHANUMERIC_PATTERN = /[\p{L}\p{N}]+/gu
 const IS_ACRONYM = /^(\P{L})*(?:\p{L}\.){2,}(\P{L})*$/u
 
@@ -92,6 +94,8 @@ export function titleCase(input: string, options: TitleCaseOptions | string[] | 
       continue
     }
 
+    if (token === undefined) continue
+
     // Ignore URLs, email addresses, acronyms, etc.
     if (IS_SPECIAL_CASE.test(token)) {
       const acronym = token.match(IS_ACRONYM)
@@ -117,7 +121,9 @@ export function titleCase(input: string, options: TitleCaseOptions | string[] | 
       let isSentenceEnd = false
 
       for (let i = 0; i < matches.length; i++) {
-        const { 0: word, index: wordIndex = 0 } = matches[i]
+        const match = matches[i]
+        if (!match) continue
+        const { 0: word, index: wordIndex = 0 } = match
         const nextChar = token.charAt(wordIndex + word.length)
 
         isSentenceEnd = terminators.has(nextChar)

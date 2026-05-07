@@ -1,39 +1,27 @@
-import type { PaymentRequestType } from '@stacksjs/orm'
-import type { NewPayment, PaymentJsonResponse } from '../../../../orm/src/models/Payment'
+type PaymentJsonResponse = ModelRow<typeof Payment>
+type NewPayment = NewModelData<typeof Payment>
+import { randomUUIDv7 } from 'bun'
 import { db } from '@stacksjs/database'
 
 /**
  * Create a new payment
  *
- * @param request The payment data to store
+ * @param data The payment data to store
  * @returns The newly created payment record
  */
-export async function store(request: PaymentRequestType): Promise<PaymentJsonResponse | undefined> {
-  await request.validate()
-
-  const paymentData: NewPayment = {
-    order_id: request.get<number>('order_id'),
-    customer_id: request.get<number>('user_id'),
-    amount: request.get<number>('amount'),
-    method: request.get('method'),
-    status: request.get('status') || 'PENDING',
-    currency: request.get('currency') || 'USD',
-    reference_number: request.get('reference_number'),
-    card_last_four: request.get('card_last_four'),
-    card_brand: request.get('card_brand'),
-    billing_email: request.get('billing_email'),
-    transaction_id: request.get('transaction_id'),
-    payment_provider: request.get('payment_provider'),
-    refund_amount: request.get<number>('refund_amount'),
-    notes: request.get('notes'),
-    uuid: request.get('uuid'),
+export async function store(data: NewPayment): Promise<PaymentJsonResponse | undefined> {
+  const paymentData = {
+    ...data,
+    status: data.status || 'PENDING',
+    currency: data.currency || 'USD',
+    uuid: randomUUIDv7(),
   }
 
   try {
     // Insert the payment record
     const createdPayment = await db
       .insertInto('payments')
-      .values(paymentData)
+      .values(paymentData as NewPayment)
       .executeTakeFirst()
 
     const insertId = Number(createdPayment.insertId) || Number(createdPayment.numInsertedOrUpdatedRows)
@@ -46,7 +34,7 @@ export async function store(request: PaymentRequestType): Promise<PaymentJsonRes
         .selectAll()
         .executeTakeFirst()
 
-      return payment
+      return payment as PaymentJsonResponse | undefined
     }
 
     return undefined

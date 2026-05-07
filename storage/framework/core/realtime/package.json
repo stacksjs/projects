@@ -1,10 +1,12 @@
 {
   "name": "@stacksjs/realtime",
   "type": "module",
-  "version": "0.70.10",
-  "description": "The Stacks realtime integration.",
+  "version": "0.70.23",
+  "description": "The Stacks realtime integration. Built on top of ts-broadcasting.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/realtime#readme",
@@ -16,24 +18,39 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["realtime", "broadcasting", "pusher", "stacks"],
+  "keywords": [
+    "realtime",
+    "broadcasting",
+    "websocket",
+    "stacks",
+    "ts-broadcasting"
+  ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "ts-broadcasting": "^0.0.5"
+  },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*"
+    "better-dx": "^0.2.12"
   }
 }

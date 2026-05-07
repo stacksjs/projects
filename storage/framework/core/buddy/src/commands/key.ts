@@ -1,8 +1,9 @@
 import type { CLI, KeyOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
+import { ExitCode } from '@stacksjs/types'
 
 export function key(buddy: CLI): void {
   const descriptions = {
@@ -21,16 +22,13 @@ export function key(buddy: CLI): void {
       await intro('buddy key:generate')
       const result = await runAction(Action.KeyGenerate, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         log.error('Failed to set random application key.', result.error)
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Random application key set.')
     })
 
-  buddy.on('key:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "key")
 }

@@ -1,9 +1,10 @@
-import type { CLI, TestOptions } from '@stacksjs/types'
+import type { CLI, TestingOptions } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { projectPath } from '@stacksjs/path'
+import { ExitCode } from '@stacksjs/types'
 
 export function test(buddy: CLI): void {
   const descriptions = {
@@ -25,7 +26,7 @@ export function test(buddy: CLI): void {
     // .option('--ui', descriptions.ui, { default: false })
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('--verbose', descriptions.verbose, { default: true })
-    .action(async (options: TestOptions) => {
+    .action(async (options: TestingOptions) => {
       const perf = await intro('buddy test')
 
       if (options.feature && options.unit) {
@@ -34,13 +35,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -52,13 +53,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -70,13 +71,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -86,13 +87,13 @@ export function test(buddy: CLI): void {
           cwd: projectPath(),
         })
 
-        if (result.isErr()) {
+        if (result.isErr) {
           await outro(
             'While running `buddy test`, there was an issue',
             { startTime: perf, useSeconds: true },
             result.error,
           )
-          process.exit()
+          process.exit(ExitCode.FatalError)
         }
       }
 
@@ -100,12 +101,15 @@ export function test(buddy: CLI): void {
         startTime: perf,
         useSeconds: true,
       })
+      // Explicit success exit so CI pipelines see a deterministic 0
+      // instead of relying on the implicit "no thrown error" exit code.
+      process.exit(ExitCode.Success)
     })
 
   buddy
     .command('test:unit', descriptions.unit)
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (options: TestOptions) => {
+    .action(async (options: TestingOptions) => {
       const perf = await intro('buddy test:unit')
       const result = await runAction(Action.TestUnit, {
         ...options,
@@ -113,13 +117,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:unit`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running unit tests', {
@@ -131,7 +135,7 @@ export function test(buddy: CLI): void {
   buddy
     .command('test:feature', descriptions.feature)
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (options: TestOptions) => {
+    .action(async (options: TestingOptions) => {
       const perf = await intro('buddy test:feature')
       const result = await runAction(Action.TestFeature, {
         ...options,
@@ -139,13 +143,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:feature`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running feature tests', {
@@ -157,7 +161,7 @@ export function test(buddy: CLI): void {
   buddy
     .command('test:ui', descriptions.command)
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (options: TestOptions) => {
+    .action(async (options: TestingOptions) => {
       const perf = await intro('buddy test:ui')
       const result = await runAction(Action.TestUi, {
         ...options,
@@ -165,13 +169,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:ui`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running tests in the browser', {
@@ -184,7 +188,7 @@ export function test(buddy: CLI): void {
     .command('test:types', descriptions.types)
     .alias('typecheck')
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (options: TestOptions) => {
+    .action(async (options: TestingOptions) => {
       const perf = await intro('buddy test:types')
       const result = await runAction(Action.Typecheck, {
         ...options,
@@ -192,13 +196,13 @@ export function test(buddy: CLI): void {
         cwd: projectPath(),
       })
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running `buddy test:types`, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Finished running typecheck', {
@@ -207,8 +211,5 @@ export function test(buddy: CLI): void {
       })
     })
 
-  buddy.on('test:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "test")
 }

@@ -174,6 +174,8 @@ export interface CliOptions {
    */
   background?: boolean
 
+  timeoutMs?: number
+
   startTime?: number
 
   /**
@@ -208,7 +210,6 @@ DomainsOptions
 
 export type BuildOption =
   | 'components'
-  | 'vueComponents'
   | 'webComponents'
   | 'elements'
   | 'functions'
@@ -267,7 +268,7 @@ export type GeneratorOption =
   | 'componentMeta'
   | 'coreSymlink'
   | 'openApiSpec'
-  | 'pkgxConfig'
+  | 'pantryConfig'
   | 'openapi'
   | 'modelFiles'
 export type GeneratorOptions = {
@@ -290,20 +291,24 @@ export type MakeBooleanOption =
   | 'model'
   | 'notification'
   | 'stack'
+  | 'middleware'
+  | 'dryRun'
+  | 'withValidation'
+  | 'withAuth'
 export type MakeOptions = {
   [key in MakeBooleanOption]: boolean
 } & {
   [key in MakeStringOption]: string
 } & CliOptions
 
-export type UpgradeBoolean = 'framework' | 'dependencies' | 'bun' | 'shell' | 'binary' | 'all' | 'force'
+export type UpgradeBoolean = 'framework' | 'dependencies' | 'bun' | 'shell' | 'binary' | 'all' | 'force' | 'canary' | 'stable' | 'noPostinstall' | 'postinstall'
 
-export type UpgradeString = 'version'
+export type UpgradeString = 'version' | 'from'
 
 export type UpgradeOptions = {
-  [key in UpgradeBoolean]: boolean
+  [key in UpgradeBoolean]?: boolean
 } & {
-  [key in UpgradeString]: string
+  [key in UpgradeString]?: string
 } & CliOptions
 
 export type ExamplesString = 'version'
@@ -314,7 +319,7 @@ export type ExamplesOptions = {
 } & {
   [key in ExamplesBoolean]: boolean
 } & CliOptions
-export type TestOptions = CliOptions & {
+export type TestingOptions = CliOptions & {
   ui?: boolean
   feature?: boolean
   unit?: boolean
@@ -388,10 +393,15 @@ export interface MigrateOptions extends CliOptions {
 
 export interface CliQueueOptions extends CliOptions {
   queue?: string
+  id?: string | number
+  all?: boolean
+  force?: boolean
+  connection?: string
 }
 
 export interface ReleaseOptions extends CliOptions {
   dryRun?: boolean
+  bump?: 'patch' | 'minor' | 'major' | 'prepatch' | 'preminor' | 'premajor' | 'prerelease' | string
 }
 export interface ProjectsOptions extends CliOptions {
   list?: boolean
@@ -412,9 +422,14 @@ export interface SearchCommandOptions extends CliOptions {
 
 export interface ScheduleOptions extends CliOptions {}
 
-export interface TinkerOptions extends CliOptions {}
+export interface TinkerOptions extends CliOptions {
+  eval?: string | boolean
+  print?: string | boolean
+  noBanner?: boolean
+  preload?: string
+}
 export interface TypesOptions extends CliOptions {}
 
-export type LibEntryType = 'vue-components' | 'web-components' | 'functions' | 'all'
+export type LibEntryType = 'web-components' | 'functions' | 'all'
 
 export type { CAC as CLI } from 'cac'

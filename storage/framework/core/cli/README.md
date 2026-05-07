@@ -286,7 +286,7 @@ import {
 log.info(`hello ${bold(italic('world'))}`)
 ```
 
-To view the full documentation, please visit [<https://stacksjs.org/cl>i](https://stacksjs.org/cli).
+To view the full documentation, please visit [<https://stacksjs.com/cl>i](https://stacksjs.com/cli).
 
 ## 🧪 Testing
 

@@ -1,33 +1,47 @@
 {
   "name": "@stacksjs/commerce",
   "type": "module",
-  "version": "0.70.10",
-  "description": "Stacks ecommerce utilities.",
+  "version": "0.70.23",
+  "description": "Stacks commerce utilities.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
-  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/ecommerce#readme",
+  "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/commerce#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stacksjs/stacks.git",
-    "directory": "./storage/framework/core/ecommerce"
+    "directory": "./storage/framework/core/commerce"
   },
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["ecommerce", "utilities", "functions", "bun", "stacks"],
+  "keywords": [
+    "commerce",
+    "utilities",
+    "functions",
+    "bun",
+    "stacks"
+  ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
@@ -37,6 +51,6 @@
     "ts-spreadsheets": "^0.2.0"
   },
   "devDependencies": {
-    "@stacksjs/development": "workspace:*"
+    "better-dx": "^0.2.12"
   }
 }

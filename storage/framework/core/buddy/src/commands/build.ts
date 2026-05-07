@@ -1,15 +1,23 @@
 import type { BuildOptions, CLI } from '@stacksjs/types'
 import process from 'node:process'
-import { runAction } from '@stacksjs/actions'
-import { intro, log, outro, prompts } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { ExitCode } from '@stacksjs/types'
+
+// Lazy-load @stacksjs/actions — importing it at module level forces every
+// `buddy <anything>` invocation to resolve the actions barrel before
+// `--help` can render. Pulling it in only when a build subcommand
+// actually fires keeps `buddy --help` snappy.
+let _runAction: typeof import('@stacksjs/actions').runAction | undefined
+async function runAction(...args: Parameters<typeof import('@stacksjs/actions').runAction>): ReturnType<typeof import('@stacksjs/actions').runAction> {
+  if (!_runAction) _runAction = (await import('@stacksjs/actions')).runAction
+  return _runAction(...args)
+}
 
 export function build(buddy: CLI): void {
   const descriptions = {
     build: 'Build any of your libraries (packages) for production use',
     components: 'Build your component library',
-    vueComponents: 'Build your Vue component library',
     webComponents: 'Build your framework agnostic web component library',
     elements: 'An alias to the -w flag',
     buddy: 'Build the Buddy binary',
@@ -28,7 +36,6 @@ export function build(buddy: CLI): void {
   buddy
     .command('build [type]', descriptions.build)
     .option('-c, --components', descriptions.components)
-    .option('-v, --vue-components', descriptions.vueComponents) // also automatically built via the -c flag
     .option('-w, --web-components', descriptions.webComponents) // also automatically built via the -c flag
     .option('-e, --elements', descriptions.elements) // alias for --web-components
     .option('-f, --functions', descriptions.functions)
@@ -46,9 +53,6 @@ export function build(buddy: CLI): void {
       switch (server) {
         case 'components':
           options.components = true
-          break
-        case 'vue':
-          options.vueComponents = true
           break
         case 'web-components':
           options.webComponents = true
@@ -78,39 +82,15 @@ export function build(buddy: CLI): void {
           break
       }
 
-      console.log('server', server, options)
-
-      // TODO: uncomment this when prompt is available
       if (hasNoOptions(options)) {
-        console.log('has no')
-        const answers = await prompts({
-          type: 'multiselect',
-          name: 'build',
-          message: descriptions.select,
-          choices: [
-            { title: 'Components', value: 'components' },
-            // { label: 'Vue Components', value: 'vue-components' },
-            { title: 'Web Components', value: 'web-components' },
-            { title: 'Functions', value: 'functions' },
-            { title: 'Views', value: 'views' },
-            { title: 'Documentation', value: 'docs' },
-          ],
-        })
-
-        console.log('answers', answers)
-        if (answers !== null)
-          process.exit(ExitCode.InvalidArgument)
-      }
-      else {
-        console.log('has op')
+        // Default to building stacks when no specific option is provided
+        options.stacks = true
       }
 
       if (options.docs)
         await runAction(Action.BuildDocs)
       if (options.components)
         await runAction(Action.BuildComponentLibs)
-      if (options.vueComponents)
-        await runAction(Action.BuildVueComponentLib)
       if (options.webComponents)
         await runAction(Action.BuildWebComponentLib)
       if (options.functions)
@@ -165,24 +145,8 @@ export function build(buddy: CLI): void {
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: BuildOptions) => {
-      log.debug('Running `buddy `build:functions` ...', options)
+      log.debug('Running `buddy build:functions` ...', options)
       await runAction(Action.BuildFunctionLib, options)
-    })
-
-  buddy
-    .command('build:vue-components', 'Automagically build Vue component library for npm/CDN distribution')
-    .alias('build:vue')
-    .alias('prod:vue-components')
-    .alias('prod:vue')
-    .option('-v, --vue-components', descriptions.vueComponents, {
-      default: true,
-    })
-    .option('-p, --project [project]', descriptions.project, { default: false })
-    .option('--verbose', descriptions.verbose, { default: false })
-    .alias('build:vue')
-    .action(async (options: BuildOptions) => {
-      log.debug('Running `buddy build:vue-components` ...', options)
-      await runAction(Action.BuildVueComponentLib, options)
     })
 
   buddy
@@ -223,9 +187,9 @@ export function build(buddy: CLI): void {
       const startTime = await intro('buddy build:core')
       const result = await runAction(Action.BuildCore, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         log.error('Failed to build the Stacks core.', result.error)
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Core packages built successfully', {
@@ -245,13 +209,13 @@ export function build(buddy: CLI): void {
       const perf = await intro('buddy build:desktop')
       const result = await runAction(Action.BuildDesktop, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running the build:desktop command, there was an issue',
           { startTime: perf, useSeconds: true },
           result.error,
         )
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       console.log('')
@@ -270,24 +234,20 @@ export function build(buddy: CLI): void {
       const startTime = await intro('buddy build:stacks')
       const result = await runAction(Action.BuildStacks, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         log.error('Failed to build Stacks.', result.error)
-        process.exit()
+        process.exit(ExitCode.FatalError)
       }
 
       await outro('Stacks built successfully', { startTime, useSeconds: true })
     })
 
-  buddy.on('build:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "build")
 }
 
 function hasNoOptions(options: BuildOptions) {
   return (
     !options.components
-    && !options.vueComponents
     && !options.webComponents
     && !options.elements
     && !options.functions
@@ -295,5 +255,6 @@ function hasNoOptions(options: BuildOptions) {
     && !options.docs
     && !options.stacks
     && !options.buddy
+    && !options.server
   )
 }

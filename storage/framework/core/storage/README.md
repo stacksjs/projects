@@ -31,7 +31,6 @@ import {
   deleteFolder,
   doesFolderExist,
   fileURLToPath,
-  fs, // fs-extra Node module
   hasComponents,
   hasFiles,
   hasFunctions,
@@ -46,7 +45,7 @@ import {
 // wip
 ```
 
-To view the full documentation, please visit [<https://stacksjs.org/storag>e](https://stacksjs.org/storage).
+To view the full documentation, please visit [<https://stacksjs.com/storag>e](https://stacksjs.com/storage).
 
 ## 🧪 Testing
 

@@ -1,5 +1,5 @@
 import { dts } from 'bun-plugin-dtsx'
-import { intro, outro } from '../build/src'
+import { frameworkExternal, intro, outro } from '../build/src'
 import { version } from './package.json'
 
 const { startTime } = await intro({
@@ -17,27 +17,10 @@ const result = await Bun.build({
   target: 'bun',
   // sourcemap: 'linked',
   minify: true,
-  splitting: true,
 
-  external: [
-    '@stacksjs/ai',
-    '@stacksjs/actions',
-    '@stacksjs/enums',
-    '@stacksjs/config',
-    '@stacksjs/dns',
-    '@stacksjs/error-handling',
-    '@stacksjs/cli',
-    '@stacksjs/cloud',
-    '@stacksjs/logging',
-    '@stacksjs/utils',
-    '@stacksjs/validation',
-    '@stacksjs/path',
-    '@stacksjs/storage',
-    '@stacksjs/types',
-    'bun',
-  ],
+  external: frameworkExternal(['ts-security-crypto', 'bun-query-builder']),
 
-  plugins: [dts({ root: './src', outdir: './dist' })],
+  plugins: [dts({ root: '.', outdir: './dist' })],
 })
 
 // Update the package.json workspace:* references to the specific version

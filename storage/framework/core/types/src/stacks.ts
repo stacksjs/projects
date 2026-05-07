@@ -2,14 +2,17 @@ import type {
   AiConfig,
   AnalyticsConfig,
   AppConfig,
+  AuthConfig,
   BinaryConfig,
   CacheConfig,
   CloudConfig,
+  DashboardConfig,
   DatabaseConfig,
   DnsConfig,
   DocsConfig,
   EmailConfig,
   ErrorConfig,
+  FilesystemsConfig,
   GitConfig,
   HashingConfig,
   LibraryConfig,
@@ -18,11 +21,11 @@ import type {
   PaymentConfig,
   Ports,
   QueueConfig,
+  RealtimeConfig,
   SaasConfig,
   SearchEngineConfig,
   SecurityConfig,
   ServicesConfig,
-  StorageConfig,
   Team,
   UiConfig,
 } from '.'
@@ -56,6 +59,24 @@ export interface StacksOptions {
   app: AppConfig
 
   /**
+   * **Auth Options**
+   *
+   * This configuration defines all of your Auth options. Because Stacks is fully-typed, you
+   * may hover any of the options below and the definitions will be provided. In case
+   * you have any questions, feel free to reach out via Discord or GitHub Discussions.
+   */
+  auth: AuthConfig
+
+  /**
+   * **Realtime Options**
+   *
+   * This configuration defines all of your Realtime options. Because Stacks is fully-typed,
+   * you may hover any of the options below and the definitions will be provided. In case
+   * you have any questions, feel free to reach out via Discord or GitHub Discussions.
+   */
+  realtime: RealtimeConfig
+
+  /**
    * **Cache Options**
    *
    * This configuration defines all of your Cache options. Because Stacks is fully-typed, you
@@ -81,6 +102,15 @@ export interface StacksOptions {
    * have any questions, feel free to reach out via Discord or GitHub Discussions.
    */
   cloud: CloudConfig
+
+  /**
+   * **Dashboard Options**
+   *
+   * Controls which sections render in the `buddy dev --dashboard` sidebar.
+   * Set per-section `enabled` flags to `false` to hide a section that this
+   * project doesn't use (e.g. `commerce.enabled: false`).
+   */
+  dashboard: DashboardConfig
 
   /**
    * **Database Options**
@@ -236,13 +266,13 @@ export interface StacksOptions {
   services: ServicesConfig
 
   /**
-   * **Storage Options**
+   * **Filesystems Options**
    *
-   * This configuration defines all of your Storage options. Because Stacks is fully-typed,
+   * This configuration defines all of your Filesystem options. Because Stacks is fully-typed,
    * you may hover any of the options below and the definitions will be provided. In case
    * you have any questions, feel free to reach out via Discord or GitHub Discussions.
    */
-  storage: StorageConfig
+  filesystems: FilesystemsConfig
 
   /**
    * **Team Members**

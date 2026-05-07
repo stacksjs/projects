@@ -1,155 +1,701 @@
-import type { Err, Ok, Result } from '@stacksjs/error-handling'
-import type { MigrationResult } from 'kysely'
-import { log } from '@stacksjs/cli'
-import { database } from '@stacksjs/config'
+/**
+ * Database Migrations using bun-query-builder
+ *
+ * This module provides migration functionality for the stacks framework
+ * powered by bun-query-builder.
+ */
+
+import type { Result } from '@stacksjs/error-handling'
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { log as _log } from '@stacksjs/logging'
+
+// Defensive log wrapper to handle cases where log methods might not be initialized.
+// Without `error` here, the catch block at runDatabaseMigration() throws
+// "log.error is not a function", which masked the underlying migration error
+// in the dev-server output.
+const log = {
+  info: (...args: any[]) => typeof _log?.info === 'function' ? (_log.info as (...a: any[]) => void)(...args) : console.log(...args),
+  success: (msg: string) => typeof _log?.success === 'function' ? _log.success(msg) : console.log(msg),
+  warn: (msg: string) => typeof _log?.warn === 'function' ? _log.warn(msg) : console.warn(msg),
+  error: (...args: any[]) => typeof _log?.error === 'function' ? (_log.error as (...a: any[]) => void)(...args) : console.error(...args),
+  debug: (...args: any[]) => typeof _log?.debug === 'function' ? (_log.debug as (...a: any[]) => void)(...args) : console.debug(...args),
+}
 import { err, handleError, ok } from '@stacksjs/error-handling'
 import { path } from '@stacksjs/path'
-import { fs, globSync } from '@stacksjs/storage'
-import { FileMigrationProvider, Migrator } from 'kysely'
-import { generateMysqlMigration, generatePostgresMigration, generateSqliteMigration, resetMysqlDatabase, resetPostgresDatabase, resetSqliteDatabase } from './drivers'
+import {
+  createQueryBuilder,
+  executeMigration as qbExecuteMigration,
+  generateMigration as qbGenerateMigration,
+  resetConnection,
+  resetDatabase as qbResetDatabase,
+  setConfig,
+} from 'bun-query-builder'
 import { db } from './utils'
 
+// Use environment variables via @stacksjs/env for proper type coercion
+import { env as envVars } from '@stacksjs/env'
+import { getConnectionDefaults } from './defaults'
+
+// Build database config from environment variables
+const dbDriver = envVars.DB_CONNECTION || 'sqlite'
+const sqliteDefaults = getConnectionDefaults('sqlite', envVars)
+const mysqlDefaults = getConnectionDefaults('mysql', envVars)
+const postgresDefaults = getConnectionDefaults('postgres', envVars)
+
+const dbConfig = {
+  default: dbDriver,
+  connections: {
+    sqlite: { database: sqliteDefaults.database, prefix: '' },
+    mysql: { name: mysqlDefaults.database, host: mysqlDefaults.host, username: mysqlDefaults.username, password: mysqlDefaults.password, port: mysqlDefaults.port, prefix: '' },
+    postgres: { name: postgresDefaults.database, host: postgresDefaults.host, username: postgresDefaults.username, password: postgresDefaults.password, port: postgresDefaults.port, prefix: '' },
+  },
+}
+
 function getDriver(): string {
-  return database.default || ''
+  return dbConfig.default || 'sqlite'
 }
 
-export function migrator(): Migrator {
-  return new Migrator({
-    db,
+function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
+  const driver = getDriver()
+  if (driver === 'sqlite') return 'sqlite'
+  if (driver === 'mysql') return 'mysql'
+  if (driver === 'postgres') return 'postgres'
+  return 'sqlite'
+}
 
-    provider: new FileMigrationProvider({
-      fs,
-      path,
-      // This needs to be an absolute path.
-      migrationFolder: path.userMigrationsPath(),
-    }),
+/**
+ * Configure bun-query-builder with stacks database settings
+ */
+function configureQueryBuilder(): void {
+  const dialect = getDialect()
+  const connectionConfig = dbConfig.connections[dialect] as any
 
-    migrationTableName: database.migrations,
-    migrationLockTableName: database.migrationLocks,
+  setConfig({
+    dialect,
+    database: {
+      database: connectionConfig?.name || connectionConfig?.database || 'stacks',
+      host: connectionConfig?.host || 'localhost',
+      port: connectionConfig?.port || (dialect === 'postgres' ? 5432 : dialect === 'mysql' ? 3306 : 0),
+      username: connectionConfig?.username || '',
+      password: connectionConfig?.password || '',
+    },
   })
+
+  // Reset the connection to ensure the new config is used
+  resetConnection()
 }
 
-// const migratorForeign = new Migrator({
-//   db,
+/**
+ * SQLite compatibility preprocessing for migrations.
+ *
+ * SQLite does not support:
+ * - ALTER TABLE ADD CONSTRAINT (foreign keys must be defined at table creation)
+ * - Creating duplicate unique indexes on columns that already have UNIQUE constraints
+ *   from inline table definitions (the index name differs but the constraint conflicts)
+ *
+ * Files that would become no-ops are deleted from disk and recorded in the
+ * migrations tracking table so they're treated as "executed" — keeping the
+ * migrations/ directory clean instead of cluttered with `SELECT 1` stubs.
+ */
+function preprocessSqliteMigrations(): void {
+  const migrationsDir = join(process.cwd(), 'database', 'migrations')
+  let files: string[]
+  try {
+    files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
+  }
+  catch {
+    return // directory doesn't exist yet
+  }
 
-//   provider: new FileMigrationProvider({
-//     fs,
-//     path,
-//     // This needs to be an absolute path.
-//     migrationFolder: path.userMigrationsPath('foreign'),
-//   }),
-// })
+  // Track which migrations we drop so we can mark them executed in the
+  // migrations table (otherwise the next generate run regenerates them).
+  const droppedMigrations: string[] = []
+  const dropMigration = (file: string, filePath: string, reason: string): void => {
+    log.info(`Dropping no-op migration (${reason}): ${file}`)
+    try { unlinkSync(filePath) }
+    catch { /* already gone */ }
+    droppedMigrations.push(file)
+  }
 
-export async function runDatabaseMigration(): Promise<Result<MigrationResult[] | string, Error>> {
+  const addConstraintPattern = /^\s*ALTER\s+TABLE\s+.+\s+ADD\s+CONSTRAINT\s+/i
+  // Match CREATE UNIQUE INDEX — these are redundant in SQLite when the table
+  // already defines the UNIQUE constraint inline during CREATE TABLE.
+  // Regular CREATE INDEX is fine and should NOT be skipped.
+  const createUniqueIndexPattern = /^\s*CREATE\s+UNIQUE\s+INDEX\s+/i
+  // Match ALTER TABLE ... DROP COLUMN — SQLite fails if the column doesn't exist
+  const dropColumnPattern = /^\s*ALTER\s+TABLE\s+["']?(\w+)["']?\s+DROP\s+COLUMN\s+["']?(\w+)["']?\s*$/i
+  // Match CREATE TABLE — used to detect when buddy regenerates a CREATE TABLE
+  // migration for a table that already has an earlier create-table file.
+  const createTablePattern = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?/i
+
+  // First pass: index every "create-<table>-table.sql" by table name. The
+  // earliest (lowest-timestamp) wins. Anything later for the same table is
+  // a duplicate from buddy regenerating migrations for an already-modeled
+  // table — drop those instead of cluttering the directory.
+  const createTableEarliest = new Map<string, string>()
+  for (const file of files) {
+    const m = file.match(/^\d+-create-(\w+)-table\.sql$/)
+    if (!m || !m[1]) continue
+    const tableName = m[1]
+    const existing = createTableEarliest.get(tableName)
+    if (!existing || file < existing) createTableEarliest.set(tableName, file)
+  }
+
+  // Open SQLite DB to check column existence for DROP COLUMN migrations
+  const sqliteDbPath = join(process.cwd(), dbConfig.connections.sqlite.database || 'stacks.db')
+  let sqliteDb: import('bun:sqlite').Database | null = null
+  if (existsSync(sqliteDbPath)) {
+    try {
+      const { Database } = require('bun:sqlite')
+      sqliteDb = new Database(sqliteDbPath, { readonly: true })
+    }
+    catch {
+      // If we can't open the DB, we'll skip DROP COLUMN checks
+    }
+  }
+
+  for (const file of files) {
+    log.debug(`[migration] Running: ${file}`)
+    const filePath = join(migrationsDir, file)
+    const content = readFileSync(filePath, 'utf-8')
+    const statements = content
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('--'))
+
+    if (statements.length === 0) continue
+
+    // Drop duplicate CREATE TABLE migrations — keep only the earliest one
+    // for each table. This handles the case where buddy regenerates a
+    // create-table migration for a table that's already modeled.
+    const firstStatement = statements[0]
+    const createTableMatch = firstStatement ? firstStatement.match(createTablePattern) : null
+    if (createTableMatch && createTableMatch[1]) {
+      const tableName = createTableMatch[1]
+      const earliest = createTableEarliest.get(tableName)
+      if (earliest && earliest !== file) {
+        dropMigration(file, filePath, `duplicate create-table for "${tableName}" (kept ${earliest})`)
+        continue
+      }
+    }
+
+    // Skip files that only contain ALTER TABLE ADD CONSTRAINT
+    const allAddConstraint = statements.every(s => addConstraintPattern.test(s))
+    if (allAddConstraint) {
+      dropMigration(file, filePath, 'SQLite does not support ALTER TABLE ADD CONSTRAINT')
+      continue
+    }
+
+    // CREATE UNIQUE INDEX fails in SQLite when the column already has
+    // a UNIQUE constraint from table creation. IF NOT EXISTS only checks
+    // by index name, not by column — so a second unique index with a
+    // different name triggers SQLITE_CONSTRAINT_UNIQUE.
+    const allCreateUniqueIndex = statements.every(s => createUniqueIndexPattern.test(s))
+    if (allCreateUniqueIndex) {
+      dropMigration(file, filePath, 'unique constraint already inline on table')
+      continue
+    }
+
+    // DROP COLUMN fails in SQLite if the column doesn't exist (e.g., on fresh DB
+    // where the CREATE TABLE already reflects the current model without the column).
+    // Filter out DROP COLUMN statements for non-existent columns. Keep all other
+    // statements unchanged.
+    const hasDropColumn = statements.some(s => dropColumnPattern.test(s))
+    if (hasDropColumn) {
+      let modified = false
+      const filteredStatements: string[] = []
+
+      for (const stmt of statements) {
+        const dropColMatch = stmt.match(dropColumnPattern)
+        if (dropColMatch && dropColMatch[1] && dropColMatch[2]) {
+          const tableName = dropColMatch[1]
+          const columnName = dropColMatch[2]
+
+          if (!sqliteDb) {
+            // No database file — fresh install. The CREATE TABLE migration will
+            // create the table from the current model (without the dropped column),
+            // so this DROP COLUMN is unnecessary.
+            log.info(`Skipping DROP COLUMN "${columnName}" — no database exists yet: ${file}`)
+            modified = true
+            continue
+          }
+
+          try {
+            // Sanitize table name to prevent SQL injection (only allow alphanumeric and underscores)
+            const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '')
+            const columns = (sqliteDb as any).prepare(`PRAGMA table_info("${safeTableName}")`).all() as Array<{ name: string }>
+            if (columns.length === 0) {
+              // Table doesn't exist yet — column will be absent from CREATE TABLE
+              log.info(`Skipping DROP COLUMN "${columnName}" — table "${tableName}" does not exist yet: ${file}`)
+              modified = true
+              continue
+            }
+            const columnExists = columns.some((col: { name: string }) => col.name === columnName)
+            if (!columnExists) {
+              log.info(`Skipping DROP COLUMN "${columnName}" from "${tableName}" — column does not exist: ${file}`)
+              modified = true
+              continue
+            }
+          }
+          catch {
+            // Table doesn't exist — skip the DROP COLUMN
+            log.info(`Skipping DROP COLUMN "${columnName}" — table "${tableName}" not found: ${file}`)
+            modified = true
+            continue
+          }
+        }
+        filteredStatements.push(stmt)
+      }
+
+      if (modified) {
+        if (filteredStatements.length === 0) {
+          dropMigration(file, filePath, 'columns already absent from table')
+        }
+        else {
+          writeFileSync(filePath, `${filteredStatements.join(';\n')};\n`)
+        }
+        continue
+      }
+    }
+  }
+
+  if (sqliteDb) {
+    try { (sqliteDb as any).close() }
+    catch { /* ignore */ }
+  }
+
+  // Record dropped migrations as executed so they don't get regenerated on
+  // the next `buddy generate:migrations` cycle. Without this, the same
+  // unique-index / add-constraint migrations would reappear every run.
+  if (droppedMigrations.length > 0) {
+    try {
+      const dbPath = join(process.cwd(), dbConfig.connections.sqlite.database || 'stacks.db')
+      if (existsSync(dbPath)) {
+        const { Database } = require('bun:sqlite')
+        const writeDb = new Database(dbPath)
+        try {
+          writeDb.exec(`CREATE TABLE IF NOT EXISTS migrations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            migration TEXT NOT NULL UNIQUE,
+            executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`)
+          const insert = writeDb.prepare('INSERT OR IGNORE INTO migrations (migration) VALUES (?)')
+          for (const migration of droppedMigrations) insert.run(migration)
+        }
+        finally { writeDb.close() }
+      }
+    }
+    catch (e) {
+      log.debug(`[migration] Could not record dropped migrations as executed: ${e}`)
+    }
+  }
+}
+
+/**
+ * Ensure the target database exists for PostgreSQL/MySQL.
+ * SQLite creates files automatically; server-based databases need an explicit CREATE DATABASE.
+ * Uses bun-query-builder's createQueryBuilder + unsafe() to connect to the admin database
+ * and issue CREATE DATABASE before switching to the target database for migrations.
+ */
+async function ensureDatabaseExists(): Promise<void> {
+  const dialect = getDialect()
+
+  if (dialect === 'sqlite')
+    return
+
+  const connectionConfig = dbConfig.connections[dialect] as any
+  const dbName = (connectionConfig?.name || 'stacks').replace(/['"]/g, '')
+  const host = connectionConfig?.host || 'localhost'
+  const port = connectionConfig?.port || (dialect === 'postgres' ? 5432 : 3306)
+  const username = connectionConfig?.username || (dialect === 'postgres' ? process.env.USER || 'postgres' : 'root')
+  const password = connectionConfig?.password || ''
+
+  // The admin database to connect to for CREATE DATABASE
+  const adminDatabase = dialect === 'postgres' ? 'postgres' : 'mysql'
+
+  try {
+    // Configure bun-query-builder to connect to the admin database
+    setConfig({
+      dialect,
+      database: {
+        database: adminDatabase,
+        host,
+        port,
+        username,
+        password,
+      },
+    })
+    resetConnection()
+
+    const adminDb = createQueryBuilder()
+
+    if (dialect === 'postgres') {
+      try {
+        await adminDb.unsafe(`CREATE DATABASE "${dbName}"`)
+        log.info(`Created database "${dbName}"`)
+      }
+      catch (e: any) {
+        // 42P04 = database already exists
+        if (e?.message?.includes('already exists') || e?.errno === '42P04') {
+          log.info(`Database "${dbName}" already exists`)
+        }
+        else {
+          throw e
+        }
+      }
+    }
+    else if (dialect === 'mysql') {
+      try {
+        await adminDb.unsafe(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``)
+        log.info(`Ensured database "${dbName}" exists`)
+      }
+      catch (e: any) {
+        if (e?.message?.includes('database exists')) {
+          log.info(`Database "${dbName}" already exists`)
+        }
+        else {
+          throw e
+        }
+      }
+    }
+
+    // Reset connection so configureQueryBuilder() can reconnect to the target database
+    resetConnection()
+  }
+  catch (error: any) {
+    log.warn(`Could not auto-create database "${dbName}": ${error?.message || error}`)
+    log.info('If the database already exists, this warning can be ignored.')
+    // Reset connection state regardless of failure
+    resetConnection()
+  }
+}
+
+/**
+ * Run database migrations
+ */
+export async function runDatabaseMigration(): Promise<Result<string, Error>> {
+  const startedAt = Date.now()
   try {
     log.info('Migrating database...')
 
-    const { error, results } = await migrator().migrateToLatest()
+    // Ensure the database exists before running migrations (PostgreSQL/MySQL)
+    await ensureDatabaseExists()
 
-    if (error) {
-      return err(handleError(error))
+    // Configure bun-query-builder with stacks database settings
+    configureQueryBuilder()
+
+    // Preprocess migrations for SQLite compatibility
+    if (getDialect() === 'sqlite') {
+      preprocessSqliteMigrations()
     }
 
-    if (results?.length === 0) {
-      log.success('No new migrations were executed')
-      return ok('No new migrations were executed')
-    }
+    const modelsDir = path.userModelsPath()
 
-    if (results)
-      return ok(results)
+    // Execute existing migration files
+    log.debug(`[migration] Running migrations from: ${modelsDir}`)
+    await qbExecuteMigration(modelsDir)
 
-    log.success('Database migration completed with no new migrations.')
-    return ok('Database migration completed with no new migrations.')
+    log.success(`Database migration completed in ${Date.now() - startedAt}ms.`)
+    return ok('Database migration completed.')
   }
   catch (error) {
+    // Surface enough context for the user to act on the failure: which
+    // migration directory, how long it ran before crashing, and the
+    // underlying error message. The previous bare "Migration failed"
+    // forced everyone to add their own debug logs.
+    const detail = error instanceof Error ? error.message : String(error)
+    log.error(`[migration] Failed after ${Date.now() - startedAt}ms: ${detail}`)
+    log.info('[migration] Run `./buddy migrate:fresh` to drop and recreate the schema if state is partial.')
     return err(handleError('Migration failed', error))
   }
 }
 
-export interface MigrationOptions {
-  name: string
-  up: string
+/**
+ * Framework tables that are not part of user models but need to be dropped
+ * These include OAuth tables, passkeys, and other framework-managed tables
+ */
+const FRAMEWORK_TABLES = [
+  'oauth_refresh_tokens', // Drop first due to foreign key to oauth_access_tokens
+  'oauth_access_tokens',
+  'oauth_clients',
+  'passkeys',
+  'failed_jobs',
+  'jobs',
+  'notifications',
+  'password_reset_tokens',
+]
+
+/**
+ * Reset the database (drop all tables)
+ */
+export async function resetDatabase(): Promise<Result<string, Error>> {
+  try {
+    // Configure bun-query-builder with stacks database settings
+    configureQueryBuilder()
+
+    const modelsDir = path.userModelsPath()
+    const dialect = getDialect()
+
+    // Drop framework tables first (OAuth, passkeys, etc.)
+    await dropFrameworkTables(dialect)
+
+    // Then drop user model tables
+    await qbResetDatabase(modelsDir, { dialect })
+
+    return ok('All tables dropped successfully!')
+  }
+  catch (error) {
+    return err(handleError('Database reset failed', error))
+  }
 }
 
-export async function resetDatabase(): Promise<Ok<string, never>> {
-  if (getDriver() === 'sqlite')
-    return await resetSqliteDatabase()
-  if (getDriver() === 'mysql')
-    return await resetMysqlDatabase()
-  if (getDriver() === 'postgres')
-    return await resetPostgresDatabase()
+/**
+ * Drop framework-managed tables (OAuth, passkeys, jobs, etc.)
+ */
+async function dropFrameworkTables(dialect: 'sqlite' | 'mysql' | 'postgres'): Promise<void> {
+  // Disable foreign key checks for MySQL to avoid constraint issues
+  if (dialect === 'mysql') {
+    try {
+      await (db as any).unsafe('SET FOREIGN_KEY_CHECKS = 0').execute()
+    }
+    catch (error) {
+      log.warn(`Could not disable foreign key checks: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
 
-  throw new Error('Unsupported database driver in resetDatabase')
+  // Disable foreign key checks for SQLite
+  if (dialect === 'sqlite') {
+    try {
+      await (db as any).unsafe('PRAGMA foreign_keys = OFF').execute()
+    }
+    catch (error) {
+      log.warn(`Could not disable foreign key checks: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  for (const tableName of FRAMEWORK_TABLES) {
+    try {
+      // SQLite uses double quotes or no quotes, MySQL uses backticks, Postgres uses double quotes with CASCADE
+      let dropSql: string
+      if (dialect === 'postgres') {
+        dropSql = `DROP TABLE IF EXISTS "${tableName}" CASCADE`
+      }
+      else if (dialect === 'mysql') {
+        dropSql = `DROP TABLE IF EXISTS \`${tableName}\``
+      }
+      else {
+        // SQLite - use double quotes for identifiers
+        dropSql = `DROP TABLE IF EXISTS "${tableName}"`
+      }
+
+      log.info(`Dropping framework table: ${tableName}`)
+
+      await (db as any).unsafe(dropSql).execute()
+
+      log.info(`Dropped framework table: ${tableName}`)
+    }
+    catch (error) {
+      // Log the actual error for debugging, but continue with other tables
+      log.warn(`Could not drop table ${tableName}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Re-enable foreign key checks for MySQL
+  if (dialect === 'mysql') {
+    try {
+      await (db as any).unsafe('SET FOREIGN_KEY_CHECKS = 1').execute()
+    }
+    catch (error) {
+      log.warn(`Could not re-enable foreign key checks: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Re-enable foreign key checks for SQLite
+  if (dialect === 'sqlite') {
+    try {
+      await (db as any).unsafe('PRAGMA foreign_keys = ON').execute()
+    }
+    catch (error) {
+      log.warn(`Could not re-enable foreign key checks: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
 }
 
-export async function generateMigrations(): Promise<Ok<string, never> | Err<string, any>> {
+/**
+ * Generate migrations based on model changes.
+ *
+ * Compares the current `app/Models/*` definitions to the stored snapshot
+ * (`.qb/model-snapshot.<dialect>.json`) via bun-query-builder, then — if
+ * there are changes — writes the resulting ALTER/CREATE/DROP statements
+ * out to a fresh file in `database/migrations/`. Each statement is
+ * grouped by table + DDL verb and lands in its own file using the
+ * runner's existing naming convention so it picks them up the same way
+ * as a hand-written migration.
+ *
+ * Without this write step the qb generator stages the diff in memory but
+ * the runner never sees it, so model edits silently no-op'd — defeating
+ * the "models are the source of truth" promise.
+ */
+export async function generateMigrations(): Promise<Result<string, Error>> {
   try {
     log.info('Generating migrations...')
 
-    const modelFiles = globSync([path.userModelsPath('*.ts'), path.storagePath('framework/defaults/models/**/*.ts')], { absolute: true })
+    // Configure bun-query-builder with stacks database settings
+    configureQueryBuilder()
 
-    for (const file of modelFiles) {
-      log.debug('Generating migration for:', file)
+    const modelsDir = path.userModelsPath()
+    const dialect = getDialect()
 
-      await generateMigration(file)
+    log.debug(`[migration] Generating migrations for dialect: ${dialect}, models: ${modelsDir}`)
+    const result = await qbGenerateMigration(modelsDir, { dialect })
+
+    if (result.hasChanges) {
+      const written = persistGeneratedMigrations(result.sqlStatements ?? [])
+      if (written > 0)
+        log.success(`Migrations generated (${written} file${written === 1 ? '' : 's'})`)
+      else
+        log.success('Migrations generated')
     }
+    else {
+      log.info('No changes detected')
+    }
+
+    return ok('Migrations generated')
+  }
+  catch (error) {
+    return err(handleError('Migration generation failed', error))
+  }
+}
+
+/**
+ * Write generated SQL to `database/migrations/` so the runner picks it up.
+ * Returns the number of files written.
+ */
+function persistGeneratedMigrations(sqlStatements: string[]): number {
+  if (!sqlStatements?.length)
+    return 0
+
+  const migrationsDir = join(process.cwd(), 'database', 'migrations')
+  try { require('node:fs').mkdirSync(migrationsDir, { recursive: true }) }
+  catch { /* already exists */ }
+
+  // Skip statements already represented in committed migrations. The qb
+  // diff will sometimes restate things after the snapshot gets rewritten,
+  // and we'd rather no-op than create a duplicate file.
+  let existingSql = ''
+  try {
+    for (const f of readdirSync(migrationsDir).filter(f => f.endsWith('.sql')))
+      existingSql += `\n${readFileSync(join(migrationsDir, f), 'utf8')}`
+  }
+  catch { /* nothing committed yet */ }
+  const normalize = (s: string): string => s.replace(/\s+/g, ' ').trim()
+  const haystack = normalize(existingSql)
+
+  const groups = groupGeneratedStatements(sqlStatements)
+  let written = 0
+  let cursor = nextMigrationNumber(migrationsDir)
+
+  for (const group of groups) {
+    const fresh = group.statements.filter(stmt => !haystack.includes(normalize(stmt)))
+    if (fresh.length === 0)
+      continue
+
+    const filename = `${String(cursor).padStart(10, '0')}-${group.label}.sql`
+    const filePath = join(migrationsDir, filename)
+    const body = `${fresh.map(s => s.trim().replace(/;\s*$/, '')).join(';\n')};\n`
+    writeFileSync(filePath, body)
+    log.debug(`[migration] Wrote ${filename} (${fresh.length} stmt${fresh.length === 1 ? '' : 's'})`)
+    written += 1
+    cursor += 1
+  }
+
+  return written
+}
+
+interface GeneratedGroup {
+  label: string
+  statements: string[]
+}
+
+/**
+ * Group generated SQL by the migration filename style the runner already
+ * uses for hand-written files: `create-<table>-table`,
+ * `alter-<table>-<col>`, `create-<index>-index-in-<table>`, or
+ * `drop-<table>-table`. Anything we can't match falls back to `auto-misc`.
+ */
+function groupGeneratedStatements(sqlStatements: string[]): GeneratedGroup[] {
+  const groups = new Map<string, string[]>()
+  const push = (label: string, stmt: string): void => {
+    const list = groups.get(label) ?? []
+    list.push(stmt)
+    groups.set(label, list)
+  }
+
+  for (const raw of sqlStatements) {
+    const stmt = raw.trim()
+    if (!stmt) continue
+
+    const create = stmt.match(/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
+    if (create) { push(`create-${create[1]}-table`, stmt); continue }
+
+    const alter = stmt.match(/^\s*ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+(?:ADD\s+COLUMN\s+["`]?(\w+)["`]?|DROP\s+COLUMN\s+["`]?(\w+)["`]?|ADD\s+CONSTRAINT)/i)
+    if (alter) { push(`alter-${alter[1]}-${alter[2] || alter[3] || 'constraint'}`, stmt); continue }
+
+    const idx = stmt.match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?\s+ON\s+["`]?(\w+)["`]?/i)
+    if (idx) { push(`create-${idx[1]}-index-in-${idx[2]}`, stmt); continue }
+
+    const drop = stmt.match(/^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
+    if (drop) { push(`drop-${drop[1]}-table`, stmt); continue }
+
+    push('auto-misc', stmt)
+  }
+
+  return [...groups.entries()].map(([label, statements]) => ({ label, statements }))
+}
+
+function nextMigrationNumber(migrationsDir: string): number {
+  let max = 0
+  try {
+    for (const f of readdirSync(migrationsDir)) {
+      const m = f.match(/^(\d+)-/)
+      if (m) max = Math.max(max, Number.parseInt(m[1], 10))
+    }
+  }
+  catch { /* directory missing — start at 1 */ }
+  return max + 1
+}
+
+/**
+ * Generate fresh migrations (full regeneration, ignoring previous state)
+ */
+export async function generateMigrations2(): Promise<Result<string, Error>> {
+  try {
+    log.info('Generating fresh migrations...')
+
+    // Configure bun-query-builder with stacks database settings
+    configureQueryBuilder()
+
+    const modelsDir = path.userModelsPath()
+    const dialect = getDialect()
+
+    await qbGenerateMigration(modelsDir, { dialect, full: true })
 
     log.success('Migrations generated')
     return ok('Migrations generated')
   }
   catch (error) {
-    return err(error)
+    return err(handleError('Fresh migration generation failed', error))
   }
 }
 
-export async function generateMigration(modelPath: string): Promise<void> {
-  if (getDriver() === 'sqlite')
-    await generateSqliteMigration(modelPath)
-
-  if (getDriver() === 'mysql')
-    await generateMysqlMigration(modelPath)
-
-  if (getDriver() === 'postgres')
-    await generatePostgresMigration(modelPath)
+/**
+ * Migration result type for compatibility
+ */
+export interface MigrationResult {
+  migrationName: string
+  direction: 'Up' | 'Down'
+  status: 'Success' | 'Error' | 'NotExecuted'
 }
 
-export async function haveModelFieldsChangedSinceLastMigration(modelPath: string): Promise<boolean> {
-  log.debug(`haveModelFieldsChangedSinceLastMigration for model: ${modelPath}`)
-
-  // const model = await import(modelPath)
-  // const tableName = model.default.table
-  // const lastMigration = await lastMigrationDate()
-
-  // now that we know the date, we need to check the git history for changes to the model file since that date
-  const cmd = ``
-  const gitHistory = await Bun.$`${cmd}`.text()
-
-  // if there are updates, then we need to check whether
-  // the updates include the any updates to the model
-  // fields that would require a migration
-
-  return !!gitHistory
-}
-
-export async function lastMigration(): Promise<any> {
-  try {
-    return await db.selectFrom('migrations').selectAll().orderBy('timestamp', 'desc').limit(1).execute()
-  }
-  catch (error) {
-    console.error('Failed to get last migration:', error)
-    return { error }
-  }
-}
-
-export async function lastMigrationDate(): Promise<string | undefined> {
-  try {
-    return (await db.selectFrom('migrations').select('timestamp').orderBy('timestamp', 'desc').limit(1).execute())[0]
-      .timestamp
-  }
-  catch (error) {
-    console.error('Failed to get last migration date:', error)
-    return undefined
-  }
-}
-
-export type { MigrationResult }
+export type { MigrationResult as MigrationResultType }

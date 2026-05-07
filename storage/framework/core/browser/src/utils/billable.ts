@@ -1,6 +1,7 @@
 import { loadStripe } from '@stripe/stripe-js'
 
-export const publishableKey: string = import.meta.env.FRONTEND_STRIPE_PUBLIC_KEY || ''
+const stacksConfig = (globalThis as any).__STACKS_CONFIG__ || {}
+export const publishableKey: string = stacksConfig.FRONTEND_STRIPE_PUBLIC_KEY || ''
 
 let client: any
 
@@ -43,7 +44,7 @@ export async function confirmCardPayment(clientSecret: string, elements: any): P
       payment_method: {
         card: elements,
         billing_details: {
-          name: 'Chris Breuer',
+          name: stacksConfig.USER_NAME || '',
         },
       },
     })
@@ -80,7 +81,7 @@ export async function confirmPayment(elements: any): Promise<{ paymentIntent: an
     const data = await client.confirmPayment({
       elements,
       confirmParams: {
-        return_url: 'http://localhost:5173/settings/billing',
+        return_url: `${window.location.origin}/settings/billing`,
       },
     })
 

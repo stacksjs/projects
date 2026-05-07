@@ -1,35 +1,12 @@
 // Import the CustomerTable type from the ORM
-import type { CouponModel } from '../../../orm/src/models/Coupon'
-import type {
-  CustomerJsonResponse,
-  CustomerModel,
-  CustomersTable,
-  CustomerUpdate,
-  NewCustomer,
-} from '../../../orm/src/models/Customer'
-import type { GiftCardJsonResponse } from '../../../orm/src/models/GiftCard'
-import type { ManufacturerJsonResponse } from '../../../orm/src/models/Manufacturer'
-import type { OrderJsonResponse } from '../../../orm/src/models/Order'
-import type { OrderItemModel } from '../../../orm/src/models/OrderItem'
-import type { ReviewJsonResponse } from '../../../orm/src/models/Review'
-// Re-export the types
-export type {
-  CustomerJsonResponse,
-  CustomersTable,
-  CustomerUpdate,
-  NewCustomer,
-}
 
-// Define response structure for paginated customers
-export interface CustomerResponse {
-  data: CustomerJsonResponse[]
-  paging: {
-    total_records: number
-    page: number
-    total_pages: number
-  }
-  next_cursor: number | null
-}
+type CouponJsonResponse = ModelRow<typeof Coupon>
+type CustomerJsonResponse = ModelRow<typeof Customer>
+type GiftCardJsonResponse = ModelRow<typeof GiftCard>
+type ManufacturerJsonResponse = ModelRow<typeof Manufacturer>
+type OrderJsonResponse = ModelRow<typeof Order>
+type OrderItemJsonResponse = ModelRow<typeof OrderItem>
+type ReviewJsonResponse = ModelRow<typeof Review>
 
 // Define the input for creating a customer
 export interface CreateCustomerInput {
@@ -144,12 +121,12 @@ export interface CouponStats {
   }[]
 }
 export interface OrderWithTotals {
-  order_items: OrderItemModel[] | []
+  order_items: OrderItemJsonResponse[] | []
   id: number
   customer_id: number
-  customer: CustomerModel | undefined
+  customer: CustomerJsonResponse | undefined
   coupon_id: number
-  coupon: CouponModel | undefined
+  coupon: CouponJsonResponse | undefined
   status: string
   total_amount: number
   tax_amount: number | undefined
@@ -223,7 +200,7 @@ export interface ReviewResponse extends BaseResponse {
   data: ReviewJsonResponse[]
 }
 
-export interface ProductManufacturerResponse extends BaseResponse {
+export interface ManufacturerResponse extends BaseResponse {
   data: ManufacturerJsonResponse[]
 }
 export interface ReviewStats {
@@ -272,26 +249,9 @@ export interface CategoryStats {
 /**
  * Options for fetching product manufacturers
  */
-export interface FetchProductManufacturersOptions {
-  /** Page number for pagination */
-  page?: number
-
-  /** Number of items per page */
-  limit?: number
-
-  /** Field to sort by */
-  sortBy?: 'manufacturer' | 'country' | 'created_at' | 'updated_at'
-
-  /** Sort direction */
-  sortDirection?: 'asc' | 'desc'
-
-  /** Filter by country */
+export interface FetchManufacturersOptions {
   country?: string
-
-  /** Filter by featured status */
   featured?: boolean
-
-  /** Search term to filter results */
   search?: string
 }
 

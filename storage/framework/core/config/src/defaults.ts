@@ -1,21 +1,80 @@
 import type { StacksOptions } from '@stacksjs/types'
-import { commandsPath, userDatabasePath } from '@stacksjs/path'
+import { commandsPath, projectPath, userDatabasePath } from '@stacksjs/path'
+
+/**
+ * Framework-wide default scalars. Defining these as named constants
+ * (rather than re-spelling the literal in each config section) keeps
+ * "where do I change the default region?" answerable from a single
+ * line — the previous shape had `'us-east-1'` typed in 4+ places that
+ * could drift when a multi-region future lands.
+ */
+export const FRAMEWORK_DEFAULTS = {
+  /** Default AWS region for SES, S3, DynamoDB, CloudFront origin shield. */
+  awsRegion: 'us-east-1',
+  /** Default scheduler / job timezone. UTC keeps cron predictable across hosts. */
+  timezone: 'UTC',
+  /** No-reply address for transactional email (override via config.email.from). */
+  noReplyEmail: 'no-reply@stacksjs.com',
+  /** Default project domain shape for new scaffolds. */
+  fallbackDomain: 'stacks.localhost',
+} as const
+
+/**
+ * Derive sane app defaults (name, url) from the project's package.json so
+ * a fresh project gets `Drivly` / `drivly.localhost` instead of the
+ * generic `Stacks` / `stacks.localhost` placeholders.
+ *
+ * Falls back to "Stacks"/"stacks.localhost" when package.json is absent
+ * or unreadable — `.env` and `config/app.ts` always win over both.
+ */
+function deriveAppDefaults(): { name: string, url: string } {
+  try {
+    const pkgPath = projectPath('package.json')
+    // eslint-disable-next-line ts/no-require-imports
+    const pkg = require(pkgPath) as { name?: string }
+    const raw = (pkg.name ?? '').trim()
+    if (!raw) return { name: 'Stacks', url: 'stacks.localhost' }
+    // Strip @scope/, replace separators, capitalise.
+    const slug = raw.replace(/^@[^/]+\//, '').toLowerCase()
+    const name = slug.replace(/[-_]+/g, ' ').replace(/(^|\s)\w/g, c => c.toUpperCase())
+    return { name, url: `${slug}.localhost` }
+  }
+  catch {
+    return { name: 'Stacks', url: 'stacks.localhost' }
+  }
+}
+
+const appDefaults = deriveAppDefaults()
 
 export const defaults: StacksOptions = {
   ai: {
     deploy: false,
     models: [
-      'amazon.titan-embed-text-v1',
-      'amazon.titan-text-express-v1',
-      'amazon.titan-embed-image-v1',
-      'amazon.titan-image-generator-v1',
-      'anthropic.claude-v1',
-      'anthropic.claude-v2',
-      'anthropic.claude-v2:1',
-      'anthropic.claude-instant-v1',
-      'meta.llama2-13b-chat-v1',
-      'meta.llama2-70b-chat-v1',
+      'anthropic.claude-sonnet-4-20250514-v1:0',
+      'anthropic.claude-haiku-4-20250514-v1:0',
+      'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      'amazon.titan-embed-text-v2:0',
+      'amazon.titan-text-premier-v1:0',
+      'amazon.titan-image-generator-v2:0',
+      'meta.llama3-1-70b-instruct-v1:0',
+      'meta.llama3-1-8b-instruct-v1:0',
     ],
+  },
+
+  auth: {
+    username: 'email',
+    password: 'password',
+    defaultTokenName: 'auth-token',
+    // Short-lived access token (1 hour). Pair with the refresh token below
+    // for a standard "rotate-on-refresh" flow. A non-expiring (or 30-day)
+    // bearer token has no recovery path if it leaks — see #1839.
+    tokenExpiry: 60 * 60 * 1000, // 1 hour
+    refreshTokenExpiry: 30 * 24 * 60 * 60 * 1000, // 30 days
+    defaultAbilities: ['*'],
+  },
+
+  realtime: {
+    driver: 'pusher',
   },
 
   analytics: {
@@ -36,13 +95,13 @@ export const defaults: StacksOptions = {
   // },
 
   app: {
-    name: 'Stacks',
+    name: appDefaults.name,
     description: 'A Stacks application.',
     env: 'local',
-    url: 'stacks.localhost',
+    url: appDefaults.url,
     debug: true,
     key: '',
-    timezone: 'UTC',
+    timezone: FRAMEWORK_DEFAULTS.timezone,
     locale: 'en',
     fallbackLocale: 'en',
     cipher: 'AES-256-CBC',
@@ -60,17 +119,25 @@ export const defaults: StacksOptions = {
   },
 
   cache: {
-    driver: 'redis',
+    driver: 'memory',
     prefix: 'stx',
     ttl: 3600,
+    maxKeys: -1,
+    useClones: true,
 
     drivers: {
       redis: {
-        connection: 'default',
         host: 'localhost',
         port: 6379,
         username: '',
         password: '',
+        database: 0,
+        tls: false,
+      },
+      memory: {
+        maxKeys: -1,
+        checkPeriod: 600,
+        deleteOnExpire: true,
       },
     },
   },
@@ -101,7 +168,7 @@ export const defaults: StacksOptions = {
         maxTtl: 31536000,
         compress: true,
         priceClass: 'PriceClass_All',
-        originShieldRegion: 'us-east-1',
+        originShieldRegion: FRAMEWORK_DEFAULTS.awsRegion,
         cookieBehavior: 'none',
         allowList: {
           cookies: [],
@@ -125,9 +192,21 @@ export const defaults: StacksOptions = {
     },
   },
 
+  dashboard: {
+    sections: {
+      library: { enabled: true },
+      content: { enabled: true },
+      commerce: { enabled: true },
+      marketing: { enabled: true },
+      analytics: { enabled: true },
+      management: { enabled: true },
+      utilities: { enabled: true },
+    },
+  },
+
   database: {
     default: 'sqlite',
-
+    logging: false,
     connections: {
       sqlite: {
         database: userDatabasePath('stacks.sqlite'),
@@ -172,18 +251,19 @@ export const defaults: StacksOptions = {
       //   code: '',
       //   placement: '',
       // },
-    },
-  },
+    } as any,
+  } as any,
 
   email: {
     from: {
       name: 'Stacks',
-      address: 'no-reply@stacksjs.org',
+      address: FRAMEWORK_DEFAULTS.noReplyEmail,
     },
 
     mailboxes: [],
 
     server: {
+      enabled: true,
       scan: true,
     },
   },
@@ -197,7 +277,7 @@ export const defaults: StacksOptions = {
       'activeUrl': 'The {{ field }} field must be a valid URL',
       'alpha': 'The {{ field }} field must contain only letters',
       'alphaNumeric': 'The {{ field }} field must contain only letters and numbers',
-      'minLength': 'The {{ field }} field must have at least {{ min }} characters',
+      'min(': 'The {{ field }} field must have at least {{ min }} characters',
       'maxLength': 'The {{ field }} field must not be greater than {{ max }} characters',
       'fixedLength': 'The {{ field }} field must be {{ size }} characters long',
       'confirmed': 'The {{ field }} field and {{ otherField }} field must be the same',
@@ -257,13 +337,13 @@ export const defaults: StacksOptions = {
 
       // record
       'record': 'The {{ field }} field must be an object',
-      'record.minLength': 'The {{ field }} field must have at least {{ min }} items',
+      'record.min(': 'The {{ field }} field must have at least {{ min }} items',
       'record.maxLength': 'The {{ field }} field must not have more than {{ max }} items',
       'record.fixedLength': 'The {{ field }} field must contain {{ size }} items',
 
       // array
       'array': 'The {{ field }} field must be an array',
-      'array.minLength': 'The {{ field }} field must have at least {{ min }} items',
+      'array.min(': 'The {{ field }} field must have at least {{ min }} items',
       'array.maxLength': 'The {{ field }} field must not have more than {{ max }} items',
       'array.fixedLength': 'The {{ field }} field must contain {{ size }} items',
       'notEmpty': 'The {{ field }} field must not be empty',
@@ -276,7 +356,7 @@ export const defaults: StacksOptions = {
       'union': 'Invalid value provided for {{ field }} field',
       'unionGroup': 'Invalid value provided for {{ field }} field',
       'unionOfTypes': 'Invalid value provided for {{ field }} field',
-    },
+    } as any,
   },
 
   git: {
@@ -395,17 +475,16 @@ export const defaults: StacksOptions = {
   },
 
   hashing: {
-    driver: 'argon2',
+    driver: 'bcrypt', // Laravel default
 
     bcrypt: {
-      rounds: 10,
-      cost: 4, // number between 4-31
+      rounds: 12, // Laravel default is 10-12, higher = more secure but slower
     },
 
     argon2: {
       memory: 65536, // memory usage in kibibytes
       // threads: 1,
-      time: 1, // the number of iterations
+      time: 2, // the number of iterations
     },
   },
 
@@ -414,27 +493,9 @@ export const defaults: StacksOptions = {
     owner: '@stacksjs', // you may or may not add the @ prefix here (it is added automatically)
     repository: 'stacksjs/stacks',
     license: 'MIT',
-    author: 'Chris Breuer',
-    contributors: ['Chris Breuer <chris@stacksjs.org>'],
+    author: '',
+    contributors: [],
     defaultLanguage: 'en',
-
-    vueComponents: {
-      name: 'hello-world-vue',
-      description: 'Your Vue component library description',
-      keywords: ['component', 'library', 'vue', 'vite', 'typescript', 'javascript'],
-      tags: [
-        {
-          name: ['HelloWorld', 'AppHelloWorld'],
-          description: 'The Hello World custom element, built via this framework.',
-          attributes: [
-            {
-              name: 'greeting',
-              description: 'The greeting.',
-            },
-          ],
-        },
-      ],
-    },
 
     webComponents: {
       name: 'hello-world-elements',
@@ -503,14 +564,13 @@ export const defaults: StacksOptions = {
         driver: 'database',
         table: 'jobs',
         queue: 'default',
-        retry_after: 90,
+        retryAfter: 90,
       },
 
       redis: {
         driver: 'redis',
-        connection: 'default',
         queue: 'default',
-        retry_after: 90,
+        retryAfter: 90,
       },
 
       sqs: {
@@ -520,10 +580,10 @@ export const defaults: StacksOptions = {
         prefix: '',
         suffix: '',
         queue: 'default',
-        region: 'us-east-1',
+        region: FRAMEWORK_DEFAULTS.awsRegion,
       },
     },
-  },
+  } as any,
 
   saas: {
     plans: [
@@ -620,7 +680,7 @@ export const defaults: StacksOptions = {
       accountId: '',
       appId: '',
       apiKey: '',
-      region: 'us-east-1',
+      region: FRAMEWORK_DEFAULTS.awsRegion,
     },
 
     algolia: {
@@ -637,17 +697,15 @@ export const defaults: StacksOptions = {
       appId: '',
       apiKey: '',
     },
-  },
+  } as any,
 
-  storage: {
+  filesystems: {
     driver: 's3',
   },
 
   team: {
-    name: 'Stacks',
-    members: {
-      'Chris Breuer': 'chris@stacksjs.org',
-    },
+    name: '',
+    members: {},
   },
 
   ui: {

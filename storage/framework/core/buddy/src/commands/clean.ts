@@ -1,7 +1,7 @@
 import type { CleanOptions, CLI } from '@stacksjs/types'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
-import { intro, log, outro } from '@stacksjs/cli'
+import { intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { ExitCode } from '@stacksjs/types'
 
@@ -19,10 +19,24 @@ export function clean(buddy: CLI): void {
     .action(async (options: CleanOptions) => {
       log.debug('Running `buddy clean` ...', options)
 
+      // Check if confirmation is needed (not forced and not no-interaction mode)
+      if (!(buddy as unknown as Record<string, unknown>).isForce && !(buddy as unknown as Record<string, unknown>).isNoInteraction) {
+        const { confirm } = await import('@stacksjs/cli')
+        const confirmed = await confirm({
+          message: 'This will remove all node_modules and lock files. Continue?',
+          initial: false,
+        })
+
+        if (!confirmed) {
+          log.info('Clean cancelled')
+          process.exit(ExitCode.Success)
+        }
+      }
+
       const perf = await intro('buddy clean')
       const result = await runAction(Action.Clean, options)
 
-      if (result.isErr()) {
+      if (result.isErr) {
         await outro(
           'While running the clean command, there was an issue',
           { startTime: perf, useSeconds: true },
@@ -39,8 +53,5 @@ export function clean(buddy: CLI): void {
       process.exit(ExitCode.Success)
     })
 
-  buddy.on('clean:*', () => {
-    console.error('Invalid command: %s\nSee --help for a list of available commands.', buddy.args.join(' '))
-    process.exit(1)
-  })
+  onUnknownSubcommand(buddy, "clean")
 }

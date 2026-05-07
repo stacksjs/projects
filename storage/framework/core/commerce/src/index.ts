@@ -1,53 +1,78 @@
-// Main ecommerce module index file
+// Main commerce module index file
 import * as coupons from './coupons'
 import * as customers from './customers'
+import * as devices from './devices'
+import * as errors from './errors'
 import * as giftCards from './gift-cards'
-import * as manufacturer from './manufacturer'
 import * as orders from './orders'
 import * as payments from './payments'
-import * as reviews from './reviews'
+import * as products from './products'
+import * as receipts from './receipts'
+import * as shippings from './shippings'
+import * as tax from './tax'
+import * as waitlists from './waitlists'
+import * as restaurant from './waitlists/restaurant'
 
-// Define types for each module
 type CouponsModule = typeof coupons
 type CustomersModule = typeof customers
+type ErrorsModule = typeof errors
+type ShippingsModule = typeof shippings
 type GiftCardsModule = typeof giftCards
-type ManufacturerModule = typeof manufacturer
 type OrdersModule = typeof orders
 type PaymentsModule = typeof payments
-type ReviewsModule = typeof reviews
+type ProductsModule = typeof products
+type RestaurantModule = typeof restaurant
+type TaxModule = typeof tax
+type WaitlistsModule = typeof waitlists
+type DevicesModule = typeof devices
+type ReceiptsModule = typeof receipts
 
-// Define the ecommerce namespace interface
-export interface EcommerceNamespace {
+export interface CommerceNamespace {
   coupons: CouponsModule
   customers: CustomersModule
+  errors: ErrorsModule
   giftCards: GiftCardsModule
-  manufacturer: ManufacturerModule
   orders: OrdersModule
   payments: PaymentsModule
-  reviews: ReviewsModule
+  products: ProductsModule
+  restaurant: RestaurantModule
+  shippings: ShippingsModule
+  tax: TaxModule
+  waitlists: WaitlistsModule
+  devices: DevicesModule
+  receipts: ReceiptsModule
 }
 
-// Create the main ecommerce namespace object with explicit type
-export const ecommerce: EcommerceNamespace = {
+export const commerce: CommerceNamespace = {
   coupons,
   customers,
+  devices,
+  errors,
   giftCards,
-  manufacturer,
   orders,
   payments,
-  reviews,
+  products,
+  receipts,
+  restaurant,
+  shippings,
+  tax,
+  waitlists,
 }
 
-// Default export for easier import
-export default ecommerce
+export default commerce
 
-// Also provide direct access to all submodules
 export {
   coupons,
   customers,
+  devices,
+  errors,
   giftCards,
-  manufacturer,
   orders,
   payments,
-  reviews,
+  products,
+  receipts,
+  restaurant,
+  shippings,
+  tax,
+  waitlists,
 }

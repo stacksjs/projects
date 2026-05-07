@@ -1,12 +1,11 @@
 export {
-  bulkRemove,
-  remove,
+  bulkDestroy,
+  destroy,
 } from './destroy'
 
 export {
+  fetchAll,
   fetchById,
-  type FetchCustomersOptions,
-  type PaginatedCustomers,
 } from './fetch'
 
 export {

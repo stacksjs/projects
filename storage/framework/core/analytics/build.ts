@@ -1,4 +1,4 @@
-import { intro, outro } from '../build/src'
+import { frameworkExternal, intro, outro } from '../build/src'
 
 const { startTime } = await intro({
   dir: import.meta.dir,
@@ -10,9 +10,10 @@ const result = await Bun.build({
   format: 'esm',
   // sourcemap: 'linked',
   minify: true,
+  external: frameworkExternal(),
   plugins: [
     // dts({
-    //   root: './src',
+    //   root: '.',
     //   outdir: './dist',
     // }),
   ],

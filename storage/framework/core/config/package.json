@@ -1,10 +1,12 @@
 {
   "name": "@stacksjs/config",
   "type": "module",
-  "version": "0.70.10",
+  "version": "0.70.23",
   "description": "The Stacks config helper methods.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/config#readme",
@@ -16,24 +18,38 @@
   "bugs": {
     "url": "https://github.com/stacksjs/stacks/issues"
   },
-  "keywords": ["config", "utilities", "functions", "stacks"],
+  "keywords": [
+    "config",
+    "utilities",
+    "functions",
+    "stacks"
+  ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
       "bun": "./*"
     }
   },
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
+  "dependencies": {
+    "ts-pantry": "^0.8.16"
+  },
   "devDependencies": {
     "@stacksjs/alias": "workspace:*",
-    "@stacksjs/development": "workspace:*",
-    "@stacksjs/types": "workspace:*"
+    "better-dx": "^0.2.12",
+    "@stacksjs/types": "workspace:*",
+    "bunfig": "^0.15.11"
   }
 }

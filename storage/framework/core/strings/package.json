@@ -1,10 +1,12 @@
 {
   "name": "@stacksjs/strings",
   "type": "module",
-  "version": "0.70.10",
+  "version": "0.70.23",
   "description": "The Stacks string utilities.",
   "author": "Chris Breuer",
-  "contributors": ["Chris Breuer <chris@stacksjs.org>"],
+  "contributors": [
+    "Chris Breuer <chris@stacksjs.com>"
+  ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/stacks/tree/main/storage/framework/core/strings#readme",
@@ -36,15 +38,21 @@
   ],
   "exports": {
     ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./*": {
+      "bun": "./src/*",
       "import": "./dist/*"
     }
   },
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "bun tsc --noEmit",
@@ -53,10 +61,8 @@
   },
   "devDependencies": {
     "@stacksjs/alias": "workspace:*",
-    "@stacksjs/development": "workspace:*",
-    "@stacksjs/types": "workspace:*",
-    "@types/validator": "^13.12.2",
-    "macroable": "^7.0.2",
-    "validator": "^13.12.0"
-  }
+    "better-dx": "^0.2.12",
+    "@stacksjs/types": "workspace:*"
+  },
+  "sideEffects": false
 }

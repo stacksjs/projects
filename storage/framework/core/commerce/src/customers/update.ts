@@ -1,64 +1,41 @@
-import type { CustomerRequestType } from '@stacksjs/orm'
-import type {
-  CustomerJsonResponse,
-  CustomerUpdate,
-} from '../types'
 import { db } from '@stacksjs/database'
+import { formatDate } from '@stacksjs/orm'
+type CustomerJsonResponse = ModelRow<typeof Customer>
+type CustomerUpdate = UpdateModelData<typeof Customer>
 
 /**
- * Update a customer by ID
+ * Update a customer
  *
  * @param id The ID of the customer to update
- * @param request The updated customer data
+ * @param data The customer data to update
  * @returns The updated customer record
  */
-export async function update(id: number, request: CustomerRequestType): Promise<CustomerJsonResponse | undefined> {
+export async function update(id: number, data: Omit<CustomerUpdate, 'id'>): Promise<CustomerJsonResponse> {
   try {
-    await request.validate()
-    // Create a single update data object directly from the request
-    const updateData: CustomerUpdate = {
-      name: request.get('name'),
-      email: request.get('email'),
-      phone: request.get('phone'),
-      total_spent: request.get<number>('totalSpent'),
-      last_order: request.get('lastOrder'),
-      status: request.get('status'),
-      avatar: request.get('avatar'),
-      user_id: request.get<number>('user_id'),
-    }
+    if (!id)
+      throw new Error('Customer ID is required for update')
 
-    if (Object.keys(updateData).length === 0) {
-      return await db
-        .selectFrom('customers')
-        .where('id', '=', id)
-        .selectAll()
-        .executeTakeFirst()
-    }
-
-    // Update the customer record
-    await db
+    const result = await db
       .updateTable('customers')
-      .set(updateData)
+      .set({
+        ...data,
+        updated_at: formatDate(new Date()),
+      })
       .where('id', '=', id)
-      .execute()
-
-    const updatedCustomer = await db
-      .selectFrom('customers')
-      .where('id', '=', id)
-      .selectAll()
+      .returningAll()
       .executeTakeFirst()
 
-    return updatedCustomer
+    if (!result)
+      throw new Error('Failed to update customer')
+
+    return result as CustomerJsonResponse
   }
   catch (error) {
-    // Handle specific errors
     if (error instanceof Error) {
-      // Check for unique constraint violation on email
       if (error.message.includes('Duplicate entry') && error.message.includes('email')) {
         throw new Error('A customer with this email already exists')
       }
 
-      // Re-throw the error with a more user-friendly message
       throw new Error(`Failed to update customer: ${error.message}`)
     }
 

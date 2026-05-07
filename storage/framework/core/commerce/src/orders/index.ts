@@ -1,6 +1,3 @@
-// Export all order functions
-
-// Delete operations
 export {
   bulkDestroy,
   bulkSoftDelete,
@@ -8,14 +5,12 @@ export {
   softDelete,
 } from './destroy'
 
-// Export operations
 export {
   downloadOrders,
   exportOrders,
   storeOrdersExport,
 } from './export'
 
-// Fetch operations
 export {
   calculateOrderMetrics,
   compareOrdersByPeriod,
@@ -24,3 +19,13 @@ export {
   fetchDailyOrderTrends,
   fetchStats,
 } from './fetch'
+
+export {
+  store,
+} from './store'
+
+export {
+  update,
+  updateDeliveryInfo,
+  updateStatus,
+} from './update'

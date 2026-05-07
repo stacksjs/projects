@@ -1,4 +1,6 @@
 // wip
+import { log } from '@stacksjs/logging'
+
 interface Printer {
   id: string | number
   name: string
@@ -31,23 +33,35 @@ interface Receipt {
 }
 
 class TSPIVPrinter implements PrinterDriver {
-  async print(receipt: Receipt): Promise<void> {
-    // eslint-disable-next-line no-console
-    console.log('TSP IV Printer: Printing receipt', receipt)
-    // Implement actual printing logic here
+  async print(printJob: PrintJob): Promise<void> {
+    log.debug('TSP IV Printer: Printing receipt', printJob.receipt)
   }
 
-  async cleanUp(): Promise<void> {
-    // eslint-disable-next-line no-console
-    console.log('TSP IV Printer: Cleaning up print job...')
-    // Implement actual cleanup logic here
+  async cleanUp(_printer: Printer): Promise<void> {
+    log.debug('TSP IV Printer: Cleaning up print job...')
   }
 
-  async checkStatus(): Promise<boolean> {
-    // eslint-disable-next-line no-console
-    console.log('TSP IV Printer: Checking online status...')
-    // Implement actual status check logic here
-    return true // Return actual status
+  async checkStatus(_printer: Printer): Promise<boolean> {
+    log.debug('TSP IV Printer: Checking online status...')
+    return true
+  }
+
+  async findPrinters(): Promise<Printer[]> {
+    log.debug('TSP IV Printer: Finding printers...')
+    return []
+  }
+
+  async setup(_printer: Printer): Promise<void> {
+    log.debug('TSP IV Printer: Setting up printer...')
+  }
+
+  async restart(): Promise<void> {
+    log.debug('TSP IV Printer: Restarting...')
+  }
+
+  async canInteractWithPrinter(_printer: Printer): Promise<boolean> {
+    log.debug('TSP IV Printer: Checking if can interact with printer...')
+    return true
   }
 }
 

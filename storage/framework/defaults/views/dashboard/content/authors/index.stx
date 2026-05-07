@@ -1,0 +1,262 @@
+@extends('layouts/default')
+
+@section('content')
+<div class="p-6 space-y-6">
+  <div class="flex items-center justify-between">
+    <PageHeader title="Authors" description="Manage all your blog authors" />
+    <button @click="openNewAuthorModal()" class="inline-flex items-center gap-2 px-3 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-500 rounded-md shadow-sm">
+      <div class="h-4 w-4 i-hugeicons-plus-sign"></div>
+      New Author
+    </button>
+  </div>
+
+  <dl class="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
+      <dt class="font-medium text-gray-500 text-sm dark:text-neutral-300">Total Authors</dt>
+      <dd class="mt-1 font-semibold text-3xl text-gray-900 dark:text-white">{{ totalAuthors }}</dd>
+    </div>
+    <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
+      <dt class="font-medium text-gray-500 text-sm dark:text-neutral-300">Total Posts</dt>
+      <dd class="mt-1 font-semibold text-3xl text-gray-900 dark:text-white">{{ totalPosts }}</dd>
+    </div>
+    <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
+      <dt class="font-medium text-gray-500 text-sm dark:text-neutral-300">Top Author</dt>
+      <dd class="mt-1 font-semibold text-3xl text-gray-900 dark:text-white">{{ topAuthorName }}</dd>
+      <dd class="mt-1 text-gray-500 text-sm dark:text-neutral-400">{{ topAuthorPosts }} posts</dd>
+    </div>
+    <div class="overflow-hidden px-4 py-5 sm:p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
+      <dt class="font-medium text-gray-500 text-sm dark:text-neutral-300">Avg Posts / Author</dt>
+      <dd class="mt-1 font-semibold text-3xl text-gray-900 dark:text-white">{{ avgPostsPerAuthor }}</dd>
+    </div>
+  </dl>
+
+  <div class="grid gap-5 grid-cols-1 lg:grid-cols-2">
+    <div class="overflow-hidden bg-white dark:bg-neutral-800 rounded-lg shadow">
+      <div class="p-6">
+        <h3 class="font-semibold leading-6 text-base text-gray-900 dark:text-white">Posts per Author</h3>
+        <div class="mt-2 h-80"><canvas id="authors_posts_chart"></canvas></div>
+      </div>
+    </div>
+    <div class="overflow-hidden bg-white dark:bg-neutral-800 rounded-lg shadow">
+      <div class="p-6">
+        <h3 class="font-semibold leading-6 text-base text-gray-900 dark:text-white">Author Distribution</h3>
+        <div class="mt-2 h-80"><canvas id="authors_distribution_chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="relative max-w-sm">
+      <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
+        <div class="h-5 w-5 text-gray-400 i-hugeicons-search-01"></div>
+      </div>
+      <input x-model="searchQuery" type="text" class="block pl-10 pr-3 py-1.5 w-full text-gray-900 sm:text-sm dark:text-white dark:bg-neutral-800 border-0 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-700 focus:ring-2 focus:ring-blue-600" placeholder="Search authors..." />
+    </div>
+    <select x-model="sortBy" class="block pl-3 pr-10 py-1.5 text-gray-900 sm:text-sm dark:text-white dark:bg-neutral-800 border-0 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-700 focus:ring-2 focus:ring-blue-600">
+      <option value="postCount">Sort by Posts</option>
+      <option value="name">Sort by Name</option>
+      <option value="created_at">Sort by Joined</option>
+    </select>
+  </div>
+
+  <div class="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    <template :for="author in filteredAuthors()">
+      <div class="overflow-hidden p-6 bg-white dark:bg-neutral-800 rounded-lg shadow">
+        <div class="flex items-center gap-4">
+          <img :src="author.avatar" :alt="author.name" class="h-16 w-16 rounded-full" />
+          <div class="flex-1 min-w-0">
+            <h3 class="font-semibold text-gray-900 truncate dark:text-white">{{ author.name }}</h3>
+            <p class="text-gray-500 text-sm truncate dark:text-neutral-400">{{ author.email }}</p>
+            <p class="text-gray-500 text-xs dark:text-neutral-500">{{ author.role }}</p>
+          </div>
+        </div>
+        <p class="mt-4 text-gray-600 text-sm dark:text-neutral-300 line-clamp-2">{{ author.bio }}</p>
+        <div class="grid gap-2 grid-cols-3 mt-4 pt-4 border-t border-gray-200 dark:border-neutral-700">
+          <div class="text-center">
+            <div class="font-semibold text-gray-900 text-lg dark:text-white">{{ author.postCount }}</div>
+            <div class="text-gray-500 text-xs dark:text-neutral-400">Posts</div>
+          </div>
+          <div class="text-center">
+            <div class="font-semibold text-gray-900 text-lg dark:text-white">{{ formatNumber(author.totalViews) }}</div>
+            <div class="text-gray-500 text-xs dark:text-neutral-400">Views</div>
+          </div>
+          <div class="text-center">
+            <div class="font-semibold text-gray-900 text-lg dark:text-white">{{ author.totalComments }}</div>
+            <div class="text-gray-500 text-xs dark:text-neutral-400">Comments</div>
+          </div>
+        </div>
+      </div>
+    </template>
+    <div :show="filteredAuthors().length === 0" class="col-span-full px-4 py-8 text-center text-gray-500 text-sm dark:text-neutral-400">No authors found.</div>
+  </div>
+
+  <div :show="showNewAuthorModal" class="relative z-10">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-neutral-900 dark:bg-opacity-75"></div>
+    <div class="fixed inset-0 overflow-y-auto z-10">
+      <div class="flex items-end justify-center sm:items-center p-4 min-h-full">
+        <div class="overflow-hidden relative pb-4 pt-5 px-4 sm:p-6 sm:max-w-lg sm:w-full bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
+          <h3 class="font-semibold leading-6 text-base text-gray-900 dark:text-white">New Author</h3>
+          <div class="mt-4 space-y-4">
+            <div>
+              <label class="block font-medium text-gray-900 text-sm dark:text-white">Name</label>
+              <input x-model="newAuthorName" type="text" class="block mt-2 py-1.5 w-full text-gray-900 sm:text-sm dark:text-white dark:bg-neutral-700 border-0 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-600 focus:ring-2 focus:ring-blue-600 shadow-sm" />
+            </div>
+            <div>
+              <label class="block font-medium text-gray-900 text-sm dark:text-white">Email</label>
+              <input x-model="newAuthorEmail" type="email" class="block mt-2 py-1.5 w-full text-gray-900 sm:text-sm dark:text-white dark:bg-neutral-700 border-0 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-600 focus:ring-2 focus:ring-blue-600 shadow-sm" />
+            </div>
+            <div>
+              <label class="block font-medium text-gray-900 text-sm dark:text-white">Role</label>
+              <select x-model="newAuthorRole" class="block mt-2 py-1.5 w-full text-gray-900 sm:text-sm dark:text-white dark:bg-neutral-700 border-0 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-600 focus:ring-2 focus:ring-blue-600 shadow-sm">
+                <option>Author</option>
+                <option>Editor</option>
+                <option>Admin</option>
+              </select>
+            </div>
+          </div>
+          <div class="sm:grid sm:gap-3 sm:grid-cols-2 mt-5">
+            <button @click="closeNewAuthorModal()" class="inline-flex justify-center px-3 py-2 sm:col-start-1 w-full font-semibold text-gray-900 text-sm dark:text-white bg-white dark:bg-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-600 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-600 shadow-sm">Cancel</button>
+            <button @click="createAuthor()" :disabled="!newAuthorName() || !newAuthorEmail()" class="inline-flex justify-center px-3 py-2 sm:col-start-2 w-full font-semibold text-sm text-white bg-blue-600 hover:bg-blue-500 rounded-md disabled:opacity-50 shadow-sm">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script client>
+// `useChart` is exposed on `window` by the dashboard layout — see
+// `views/dashboard/layouts/default.stx`. Importing it relatively from
+// `../../composables` would force STX's client-script bundler down a path
+// that can't resolve relative imports from its temp dir, so we rely on
+// the layout's global instead.
+
+interface Author {
+  id: number
+  name: string
+  email: string
+  role: string
+  avatar: string
+  bio: string
+  postCount: number
+  totalViews: number
+  totalComments: number
+  created_at: string
+}
+
+interface ChartLike { destroy: () => void }
+type ChartCtor = new (canvas: HTMLElement, config: { type: string, data: unknown, options?: unknown }) => ChartLike
+
+const initialAuthors: Author[] = [
+  { id: 1, name: 'Jane Doe', email: 'jane@example.com', role: 'Editor', avatar: 'https://i.pravatar.cc/150?img=1', bio: 'Tech writer with 10+ years of experience covering web frameworks and performance.', postCount: 24, totalViews: 145000, totalComments: 312, created_at: '2022-01-15' },
+  { id: 2, name: 'John Smith', email: 'john@example.com', role: 'Author', avatar: 'https://i.pravatar.cc/150?img=2', bio: 'Specialist in TypeScript and frontend tooling.', postCount: 18, totalViews: 98000, totalComments: 220, created_at: '2022-04-08' },
+  { id: 3, name: 'Michael Brown', email: 'michael@example.com', role: 'Author', avatar: 'https://i.pravatar.cc/150?img=3', bio: 'Reviews hardware and software for developers.', postCount: 12, totalViews: 64000, totalComments: 145, created_at: '2022-09-21' },
+  { id: 4, name: 'Emily Davis', email: 'emily@example.com', role: 'Author', avatar: 'https://i.pravatar.cc/150?img=4', bio: 'Accessibility advocate and design systems engineer.', postCount: 9, totalViews: 41000, totalComments: 88, created_at: '2023-02-14' },
+  { id: 5, name: 'Sarah Williams', email: 'sarah@example.com', role: 'Author', avatar: 'https://i.pravatar.cc/150?img=5', bio: 'Backend engineer focused on API design and databases.', postCount: 6, totalViews: 22000, totalComments: 47, created_at: '2023-06-30' },
+]
+
+const authors = state<Author[]>(initialAuthors)
+const searchQuery = state('')
+const sortBy = state<'postCount' | 'name' | 'created_at'>('postCount')
+const showNewAuthorModal = state(false)
+const newAuthorName = state('')
+const newAuthorEmail = state('')
+const newAuthorRole = state('Author')
+
+const filteredAuthors = derived(() => {
+  let list = [...authors()]
+  const q = searchQuery().toLowerCase()
+  if (q)
+    list = list.filter(a => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
+  list.sort((a, b) => {
+    if (sortBy() === 'name')
+      return a.name.localeCompare(b.name)
+    if (sortBy() === 'created_at')
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    return b.postCount - a.postCount
+  })
+  return list
+})
+
+const totalAuthors = derived(() => authors().length)
+const totalPosts = derived(() => authors().reduce((s, a) => s + a.postCount, 0))
+const topAuthor = derived(() => authors().reduce((top, a) => a.postCount > top.postCount ? a : top, { name: 'None', postCount: 0 } as Author))
+const topAuthorName = derived(() => topAuthor().name)
+const topAuthorPosts = derived(() => topAuthor().postCount)
+const avgPostsPerAuthor = derived(() => totalAuthors() > 0 ? (totalPosts() / totalAuthors()).toFixed(1) : '0.0')
+
+function formatNumber(n: number) {
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+function openNewAuthorModal() {
+  newAuthorName.set('')
+  newAuthorEmail.set('')
+  newAuthorRole.set('Author')
+  showNewAuthorModal.set(true)
+}
+
+function closeNewAuthorModal() {
+  showNewAuthorModal.set(false)
+}
+
+function createAuthor() {
+  if (!newAuthorName() || !newAuthorEmail())
+    return
+  const newId = (authors()[authors().length - 1]?.id ?? 0) + 1
+  authors.set([...authors(), {
+    id: newId,
+    name: newAuthorName(),
+    email: newAuthorEmail(),
+    role: newAuthorRole(),
+    avatar: `https://i.pravatar.cc/150?img=${newId}`,
+    bio: '',
+    postCount: 0,
+    totalViews: 0,
+    totalComments: 0,
+    created_at: new Date().toISOString().slice(0, 10),
+  }])
+  closeNewAuthorModal()
+}
+
+let chartHandles: ChartLike[] = []
+
+onMount(async () => {
+  const { Chart, registerables } = await import('@stacksjs/charts')
+  Chart.register(...registerables)
+  const Ctor = Chart as unknown as ChartCtor
+
+  const list = authors()
+  const labels = list.map(a => a.name)
+  const data = list.map(a => a.postCount)
+  const palette = ['rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(139, 92, 246, 0.8)', 'rgba(236, 72, 153, 0.8)']
+
+  const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0, 0, 0, 0.05)' } }, x: { grid: { display: false } } } }
+  const doughnutOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' } } }
+
+  const handles: Array<ChartLike | null> = [
+    useChart({
+      Chart: Ctor,
+      id: 'authors_posts_chart',
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Posts', backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 4, data }] },
+      options: chartOptions,
+    }) as ChartLike | null,
+    useChart({
+      Chart: Ctor,
+      id: 'authors_distribution_chart',
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: palette.slice(0, labels.length), borderWidth: 0 }] },
+      options: doughnutOptions,
+    }) as ChartLike | null,
+  ]
+  chartHandles = handles.filter((h): h is ChartLike => h !== null)
+})
+
+onDestroy(() => {
+  chartHandles.forEach(h => h.destroy())
+  chartHandles = []
+})
+</script>
+
+@endsection
