@@ -51,7 +51,7 @@
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.12",
-    "ts-collect": "^0.4.0"
+    "better-dx": "^0.2.19",
+    "ts-collect": "^0.4.3"
   }
 }
