@@ -49,7 +49,7 @@
   "dependencies": {
     "@stacksjs/composables": "workspace:*",
     "@stacksjs/stx": "^0.2.82",
-    "@stripe/stripe-js": "^9.0.0",
+    "@stripe/stripe-js": "^10.0.0",
     "bun-query-builder": "^0.1.16",
     "magic-regexp": "^0.11.0"
   },
