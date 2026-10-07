@@ -48,12 +48,12 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@babel/generator": "^7.29.1",
-    "@babel/traverse": "^7.29.0"
+    "@babel/generator": "^7.29.8",
+    "@babel/traverse": "^7.29.8"
   },
   "devDependencies": {
     "@stacksjs/cli": "workspace:*",
-    "better-dx": "^0.2.12",
+    "better-dx": "^0.2.37",
     "@stacksjs/path": "workspace:*",
     "@stacksjs/storage": "workspace:*"
   }

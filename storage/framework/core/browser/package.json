@@ -48,13 +48,13 @@
   },
   "dependencies": {
     "@stacksjs/composables": "workspace:*",
-    "@stacksjs/stx": "^0.2.82",
-    "@stripe/stripe-js": "^9.0.0",
-    "bun-query-builder": "^0.1.16",
-    "magic-regexp": "^0.11.0"
+    "@stacksjs/stx": "^0.2.395",
+    "@stripe/stripe-js": "^9.17.0",
+    "bun-query-builder": "^0.3.5",
+    "magic-regexp": "^0.11.2"
   },
   "devDependencies": {
-    "better-dx": "^0.2.12",
+    "better-dx": "^0.2.37",
     "@stacksjs/utils": "workspace:*"
   }
 }
